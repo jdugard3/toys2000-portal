@@ -1,0 +1,256 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { generatePO } from '@/lib/po-number';
+import { formatCurrency, vendorSubtotal } from '@/lib/cart';
+import { getVendorMinimum, meetsVendorMinimum } from '@/lib/vendor-minimums';
+import FreightNudge from './FreightNudge';
+import toast from 'react-hot-toast';
+
+export default function CheckoutForm({ group, customer, shipTos = [], shippingMethods = [], onSuccess }) {
+  const { manufacturerID, manufacturerName, items } = group;
+
+  const [poNumber, setPoNumber] = useState('');
+  const [shipToID, setShipToID] = useState('');
+  const [shippingMethod, setShippingMethod] = useState('');
+  const [shipDate, setShipDate] = useState('');
+  const [cancelDate, setCancelDate] = useState('');
+  const [acceptBackOrder, setAcceptBackOrder] = useState(true);
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [orderPromos, setOrderPromos] = useState([]);
+
+  const subtotal = vendorSubtotal(items);
+  const minimum = getVendorMinimum(manufacturerID);
+  const belowMinimum = minimum > 0 && subtotal < minimum;
+
+  useEffect(() => {
+    setPoNumber(generatePO());
+    if (shipTos.length > 0) setShipToID(String(shipTos[0]?.retailerShipToID ?? shipTos[0]?.id ?? ''));
+    if (shippingMethods.length > 0) setShippingMethod(shippingMethods[0]?.shippingMethod ?? shippingMethods[0]?.name ?? '');
+  }, [shipTos, shippingMethods]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (belowMinimum) {
+      toast.error(`Order must be at least ${formatCurrency(minimum)} for ${manufacturerName}.`);
+      return;
+    }
+
+    if (!shipToID) {
+      toast.error('Please select a ship-to address.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    const payload = {
+      manufacturerID,
+      retailerShipToID: parseInt(shipToID, 10),
+      poNumber: poNumber.trim(),
+      shippingMethod,
+      shipDate: shipDate || undefined,
+      cancelDate: cancelDate || undefined,
+      acceptBackOrder,
+      orderDate: new Date().toISOString(),
+      requestDate: new Date().toISOString(),
+      details: items.map((item) => ({
+        itemNumber: item.item_number,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        unitQty: item.unit_qty ?? item.quantity,
+      })),
+    };
+
+    if (notes.trim()) {
+      payload.specialInstructions = `Net 30. ${notes.trim()}`;
+    }
+
+    try {
+      const res = await fetch('/api/markettime/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Order submission failed');
+      }
+
+      // Capture any promotions from the response for the freight nudge
+      if (data.order?.orderPromotions?.length) {
+        setOrderPromos(data.order.orderPromotions);
+      }
+
+      toast.success(`Order placed with ${manufacturerName}!`);
+      onSuccess?.(data.order);
+    } catch (err) {
+      toast.error(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Vendor summary */}
+      <div className="bg-white rounded-2xl border border-black/[0.06] p-5">
+        <h2 className="font-bold text-[#1a1d26] text-lg mb-4" style={{ fontFamily: "'Baloo 2', cursive" }}>
+          {manufacturerName}
+        </h2>
+
+        {/* Items */}
+        <div className="space-y-2 mb-4">
+          {items.map((item) => (
+            <div key={item.id} className="flex justify-between text-sm">
+              <span className="text-[#1a1d26] line-clamp-1 flex-1 mr-4">{item.name} × {item.quantity}</span>
+              <span className="font-semibold text-[#1a1d26] flex-shrink-0">{formatCurrency(item.unit_price * item.quantity)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-black/[0.06] pt-3 flex justify-between font-bold">
+          <span>Subtotal</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+
+        {belowMinimum && (
+          <div className="mt-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+            Minimum order for {manufacturerName} is {formatCurrency(minimum)}. Add {formatCurrency(minimum - subtotal)} more to proceed.
+          </div>
+        )}
+      </div>
+
+      {/* Freight nudge (shown if promotions loaded) */}
+      {orderPromos.length > 0 && (
+        <FreightNudge promotions={orderPromos} subtotal={subtotal} manufacturerName={manufacturerName} />
+      )}
+
+      {/* Payment terms — read-only */}
+      <div className="bg-[#f0fdf4] border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+        <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <p className="text-sm font-semibold text-green-800">Net 30 Terms — No payment required now</p>
+          <p className="text-xs text-green-700 mt-0.5">The vendor will contact you directly to arrange payment.</p>
+        </div>
+      </div>
+
+      {/* Ship-to address */}
+      {shipTos.length > 0 && (
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-5 space-y-4">
+          <h3 className="font-bold text-[#1a1d26]" style={{ fontFamily: "'Baloo 2', cursive" }}>Shipping</h3>
+
+          <div>
+            <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Ship-to address</label>
+            <select
+              value={shipToID}
+              onChange={(e) => setShipToID(e.target.value)}
+              required
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
+            >
+              {shipTos.map((s) => (
+                <option key={s.retailerShipToID ?? s.id} value={s.retailerShipToID ?? s.id}>
+                  {s.addressName || s.address1} — {s.city}, {s.state}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {shippingMethods.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Shipping method</label>
+              <select
+                value={shippingMethod}
+                onChange={(e) => setShippingMethod(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
+              >
+                {shippingMethods.map((m) => (
+                  <option key={m.shippingMethod ?? m.name} value={m.shippingMethod ?? m.name}>
+                    {m.shippingMethod ?? m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Requested ship date</label>
+              <input
+                type="date"
+                value={shipDate}
+                onChange={(e) => setShipDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Cancel if not shipped by</label>
+              <input
+                type="date"
+                value={cancelDate}
+                onChange={(e) => setCancelDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order details */}
+      <div className="bg-white rounded-2xl border border-black/[0.06] p-5 space-y-4">
+        <h3 className="font-bold text-[#1a1d26]" style={{ fontFamily: "'Baloo 2', cursive" }}>Order Details</h3>
+
+        <div>
+          <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">PO Number</label>
+          <input
+            type="text"
+            value={poNumber}
+            onChange={(e) => setPoNumber(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:border-[#f15a24]"
+            placeholder="T2K-YYYYMMDD-XXXX"
+          />
+          <p className="text-xs text-[#5f6980] mt-1">Auto-generated — edit if you have your own PO number.</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="backorder"
+            checked={acceptBackOrder}
+            onChange={(e) => setAcceptBackOrder(e.target.checked)}
+            className="w-4 h-4 accent-[#f15a24]"
+          />
+          <label htmlFor="backorder" className="text-sm text-[#1a1d26]">
+            Accept backorders if items are temporarily out of stock
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Additional notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24] resize-none"
+            placeholder="Any special instructions for this order…"
+          />
+        </div>
+      </div>
+
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={submitting || belowMinimum}
+        className="w-full py-3.5 rounded-xl font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive", fontSize: '1rem' }}
+      >
+        {submitting ? 'Placing order…' : `Place order with ${manufacturerName}`}
+      </button>
+    </form>
+  );
+}

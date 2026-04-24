@@ -1,6 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        // MarketTime product images
+        protocol: 'https',
+        hostname: '**.markettime.com',
+      },
+      {
+        protocol: 'http',
+        hostname: '**.markettime.com',
+      },
+    ],
+  },
 };
 
 export default nextConfig;
