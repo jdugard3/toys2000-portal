@@ -3,12 +3,13 @@ import { getManufacturerShippingMethods } from '@/lib/markettime';
 import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
+  const { id } = await params;
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const shippingMethods = await getManufacturerShippingMethods(params.id);
+    const shippingMethods = await getManufacturerShippingMethods(id);
     return NextResponse.json({ shippingMethods });
   } catch (err) {
     console.error('[/api/markettime/manufacturer/shipping]', err);

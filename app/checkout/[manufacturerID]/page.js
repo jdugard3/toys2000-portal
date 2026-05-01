@@ -10,13 +10,13 @@ export default async function CheckoutPage({ params }) {
   const { manufacturerID } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login?redirect=/cart');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?redirect=/cart');
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('retailer_id, company_name, approved')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
   // Fetch manufacturer from Supabase cache

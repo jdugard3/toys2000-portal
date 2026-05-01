@@ -11,35 +11,43 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [userId, setUserId] = useState(null);
   const supabase = createBrowserClient();
 
-  const fetchCart = useCallback(async () => {
+  const loadCartForUser = useCallback(async (currentUserId) => {
     if (!supabase) { setLoading(false); return; }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setCartItems([]); setLoading(false); return; }
+    if (!currentUserId) { setCartItems([]); setLoading(false); return; }
 
     const { data } = await supabase
       .from('cart_items')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', currentUserId)
       .order('created_at');
 
     setCartItems(data ?? []);
     setLoading(false);
   }, [supabase]);
 
-  useEffect(() => {
-    fetchCart();
+  const fetchCart = useCallback(() => loadCartForUser(userId), [loadCartForUser, userId]);
 
-    if (!supabase) return;
-    const { data: listener } = supabase.auth.onAuthStateChange(() => fetchCart());
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUserId = session?.user?.id ?? null;
+      setUserId(currentUserId);
+      void loadCartForUser(currentUserId);
+    });
+
     return () => listener.subscription.unsubscribe();
-  }, [fetchCart, supabase]);
+  }, [loadCartForUser, supabase]);
 
   const addToCart = useCallback(async ({ product, quantity }) => {
     if (!supabase) { toast.error('Sign in to add items to your cart.'); return; }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast.error('Sign in to add items to your cart.'); return; }
+    if (!userId) { toast.error('Sign in to add items to your cart.'); return; }
 
     const validQty = snapQuantity(quantity, product.minimum_quantity, product.quantity_increment);
 
@@ -58,7 +66,7 @@ export function CartProvider({ children }) {
       setCartItems((prev) => prev.map((i) => i.id === existing.id ? data : i));
     } else {
       const row = {
-        user_id: session.user.id,
+        user_id: userId,
         item_id: product.record_id,
         item_number: product.item_number,
         manufacturer_id: product.manufacturer_id,
@@ -77,7 +85,7 @@ export function CartProvider({ children }) {
 
     toast.success(`${product.name} added to cart`);
     setCartOpen(true);
-  }, [cartItems, supabase]);
+  }, [cartItems, supabase, userId]);
 
   const updateQuantity = useCallback(async (cartItemId, newQuantity) => {
     if (!supabase) return;
@@ -104,17 +112,16 @@ export function CartProvider({ children }) {
 
   const clearCart = useCallback(async (manufacturerID = null) => {
     if (!supabase) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!userId) return;
 
-    let query = supabase.from('cart_items').delete().eq('user_id', session.user.id);
+    let query = supabase.from('cart_items').delete().eq('user_id', userId);
     if (manufacturerID) query = query.eq('manufacturer_id', manufacturerID);
 
     await query;
     setCartItems((prev) =>
       manufacturerID ? prev.filter((i) => i.manufacturer_id !== manufacturerID) : []
     );
-  }, [supabase]);
+  }, [supabase, userId]);
 
   const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 

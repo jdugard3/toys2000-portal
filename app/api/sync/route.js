@@ -4,6 +4,22 @@ import { NextResponse } from 'next/server';
 
 const PAGE_SIZE = 250;
 
+async function withRetry(label, fn, attempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt === attempts) break;
+      const delayMs = 750 * attempt;
+      console.warn(`[Sync] ${label} failed (attempt ${attempt}/${attempts}); retrying in ${delayMs}ms`, err);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
 function isAuthorized(request) {
   const authHeader = request.headers.get('authorization');
   // Vercel cron uses CRON_SECRET; admin trigger uses SUPABASE_SERVICE_ROLE_KEY
@@ -58,14 +74,11 @@ async function runSync({ modifiedStartDate, isFull }) {
 
   const startedAt = new Date().toISOString();
 
-  let logId;
+  const logId = crypto.randomUUID();
   try {
-    const { data: log } = await db
+    await db
       .from('sync_log')
-      .insert({ started_at: startedAt })
-      .select('id')
-      .single();
-    logId = log?.id;
+      .insert({ id: logId, started_at: startedAt });
   } catch {
     // Non-fatal — sync proceeds even if we can't log the start
   }
@@ -76,7 +89,7 @@ async function runSync({ modifiedStartDate, isFull }) {
 
   try {
     // ── Step 1: Sync manufacturers ──────────────────────────────────────────
-    const mfrsResponse = await getManufacturers();
+    const mfrsResponse = await withRetry('GET /manufacturers', () => getManufacturers());
     const manufacturers = Array.isArray(mfrsResponse) ? mfrsResponse : mfrsResponse?.records ?? [];
 
     if (manufacturers.length > 0) {
@@ -106,7 +119,11 @@ async function runSync({ modifiedStartDate, isFull }) {
         params.modifiedStartDate = modifiedStartDate;
       }
 
-      const response = await getItems(params);
+      const response = await withRetry(
+        `GET /items offset=${offset}`,
+        () => getItems(params),
+        4
+      );
       const records = Array.isArray(response) ? response : response?.records ?? [];
 
       if (records.length === 0) {
@@ -148,6 +165,38 @@ async function runSync({ modifiedStartDate, isFull }) {
         }));
 
       if (productRows.length > 0) {
+        // Some item manufacturerIDs may not appear in GET /manufacturers. Insert
+        // lightweight placeholder rows first so the products FK does not block sync.
+        const manufacturerPlaceholders = [
+          ...new Map(
+            productRows
+              .filter((item) => item.manufacturer_id)
+              .map((item) => [
+                item.manufacturer_id,
+                {
+                  manufacturer_id: item.manufacturer_id,
+                  name: item.manufacturer_name || item.manufacturer_id,
+                  raw: {
+                    source: 'products-sync-placeholder',
+                    manufacturerID: item.manufacturer_id,
+                    manufacturerName: item.manufacturer_name,
+                  },
+                  last_synced_at: new Date().toISOString(),
+                },
+              ])
+          ).values(),
+        ];
+
+        if (manufacturerPlaceholders.length > 0) {
+          const { error: placeholderError } = await db
+            .from('manufacturers')
+            .upsert(manufacturerPlaceholders, { onConflict: 'manufacturer_id', ignoreDuplicates: true });
+
+          if (placeholderError) {
+            throw new Error(`Manufacturer placeholder upsert failed: ${placeholderError.message}`);
+          }
+        }
+
         const { error: productError } = await db
           .from('products')
           .upsert(productRows, { onConflict: 'record_id' });
@@ -170,14 +219,12 @@ async function runSync({ modifiedStartDate, isFull }) {
 
   // Write final sync_log entry
   const finishedAt = new Date().toISOString();
-  if (logId) {
-    await db.from('sync_log').update({
-      finished_at: finishedAt,
-      items_synced: itemsSynced,
-      manufacturers_synced: manufacturersSynced,
-      error: syncError,
-    }).eq('id', logId);
-  }
+  await db.from('sync_log').update({
+    finished_at: finishedAt,
+    items_synced: itemsSynced,
+    manufacturers_synced: manufacturersSynced,
+    error: syncError,
+  }).eq('id', logId);
 
   const success = !syncError;
   return NextResponse.json(

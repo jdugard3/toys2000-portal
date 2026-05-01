@@ -36,7 +36,7 @@ export async function GET(request) {
     .eq('show_on_website', true)
     .eq('discontinued', false)
     .range(offset, offset + limit - 1)
-    .order('name');
+    .order('record_id');
 
   if (manufacturerID) {
     query = query.eq('manufacturer_id', manufacturerID);

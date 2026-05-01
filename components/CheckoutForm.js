@@ -105,7 +105,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
         {/* Items */}
         <div className="space-y-2 mb-4">
           {items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
+            <div key={item.id ?? item.item_id ?? item.item_number} className="flex justify-between text-sm">
               <span className="text-[#1a1d26] line-clamp-1 flex-1 mr-4">{item.name} × {item.quantity}</span>
               <span className="font-semibold text-[#1a1d26] flex-shrink-0">{formatCurrency(item.unit_price * item.quantity)}</span>
             </div>
@@ -153,8 +153,8 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
               required
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
             >
-              {shipTos.map((s) => (
-                <option key={s.retailerShipToID ?? s.id} value={s.retailerShipToID ?? s.id}>
+              {shipTos.map((s, index) => (
+                <option key={s.retailerShipToID ?? s.id ?? index} value={s.retailerShipToID ?? s.id}>
                   {s.addressName || s.address1} — {s.city}, {s.state}
                 </option>
               ))}
@@ -169,8 +169,8 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
                 onChange={(e) => setShippingMethod(e.target.value)}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
               >
-                {shippingMethods.map((m) => (
-                  <option key={m.shippingMethod ?? m.name} value={m.shippingMethod ?? m.name}>
+                {shippingMethods.map((m, index) => (
+                  <option key={m.recordID ?? m.shippingMethod ?? m.name ?? index} value={m.shippingMethod ?? m.name}>
                     {m.shippingMethod ?? m.name}
                   </option>
                 ))}

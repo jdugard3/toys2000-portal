@@ -38,7 +38,7 @@ export default async function OrderDetailPage({ params }) {
   try {
     const orders = await getOrders({
       retailerID: profile.retailer_id,
-      repGroupID: process.env.MT_REP_GROUP_ID,
+      recordID: orderID,
     });
     const list = Array.isArray(orders) ? orders : orders?.records ?? [];
     order = list.find((o) => String(o.recordID ?? o.id) === String(orderID));

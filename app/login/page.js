@@ -27,6 +27,21 @@ function LoginForm() {
 
   const supabase = createBrowserClient();
 
+  const linkMarketTimeProfile = async () => {
+    try {
+      const res = await fetch('/api/profile/link-markettime', { method: 'POST' });
+      const data = await res.json();
+
+      if (data.linked && data.approved) {
+        toast.success('MarketTime account linked.');
+      } else if (data.linked && !data.approved) {
+        toast('MarketTime account found, but it is still pending approval.');
+      }
+    } catch {
+      // Linking is best-effort; customers can still browse while pending.
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -35,17 +50,25 @@ function LoginForm() {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await linkMarketTimeProfile();
         toast.success('Welcome back!');
         router.push(redirect);
         router.refresh();
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
         });
         if (error) throw error;
-        toast.success('Check your email to confirm your account.');
+        if (data.session) {
+          await linkMarketTimeProfile();
+          toast.success('Portal account created.');
+          router.push(redirect);
+          router.refresh();
+        } else {
+          toast.success('Check your email to confirm your portal account.');
+        }
       }
     } catch (err) {
       toast.error(err.message || 'Something went wrong. Please try again.');
@@ -164,17 +187,29 @@ function LoginForm() {
 
           <div className="mt-6 text-center text-sm text-[#5f6980]">
             {mode === 'login' ? (
-              <>
-                Don&apos;t have an account?{' '}
-                <a
-                  href={process.env.NEXT_PUBLIC_MT_B2B_SIGNUP_URL || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#f15a24] font-semibold hover:underline"
-                >
-                  Register with Toys2000
-                </a>
-              </>
+              <div className="space-y-2">
+                <p>
+                  Already approved by MarketTime?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('signup')}
+                    className="text-[#f15a24] font-semibold hover:underline"
+                  >
+                    Create portal login
+                  </button>
+                </p>
+                <p>
+                  Need approval first?{' '}
+                  <a
+                    href="/api/register"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#00aeef] font-semibold hover:underline"
+                  >
+                    Register with Toys2000
+                  </a>
+                </p>
+              </div>
             ) : (
               <>
                 Already have an account?{' '}

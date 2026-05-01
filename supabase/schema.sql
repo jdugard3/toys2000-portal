@@ -152,27 +152,57 @@ alter table products enable row level security;
 alter table manufacturers enable row level security;
 alter table sync_log enable row level security;
 
--- profiles: users can read and update their own row only
+-- Helper used by RLS policies. SECURITY DEFINER avoids recursive policy checks
+-- when asking whether the current authenticated user is an admin.
+create or replace function public.is_admin(user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = user_id
+      and is_admin = true
+  );
+$$;
+
+-- profiles: users can read their own row. Admins can read/update all profiles.
+-- Do not allow regular users to update their own profile row because that would
+-- allow privilege escalation via is_admin/approved/retailer_id.
+drop policy if exists "Users can view own profile" on profiles;
+drop policy if exists "Users can update own profile" on profiles;
+drop policy if exists "Admins can view all profiles" on profiles;
+drop policy if exists "Admins can update all profiles" on profiles;
+
 create policy "Users can view own profile"
   on profiles for select using (auth.uid() = id);
 
-create policy "Users can update own profile"
-  on profiles for update using (auth.uid() = id);
+create policy "Admins can view all profiles"
+  on profiles for select using (public.is_admin());
+
+create policy "Admins can update all profiles"
+  on profiles for update using (public.is_admin()) with check (public.is_admin());
 
 -- cart_items: users can only see and manage their own cart
+drop policy if exists "Users manage own cart" on cart_items;
 create policy "Users manage own cart"
   on cart_items for all using (auth.uid() = user_id);
 
 -- products: anyone authenticated can read (browsing is auth-gated via middleware)
+drop policy if exists "Authenticated users can read products" on products;
 create policy "Authenticated users can read products"
   on products for select using (auth.role() = 'authenticated');
 
 -- manufacturers: same
+drop policy if exists "Authenticated users can read manufacturers" on manufacturers;
 create policy "Authenticated users can read manufacturers"
   on manufacturers for select using (auth.role() = 'authenticated');
 
 -- sync_log: admin only (via service role in sync routes)
 -- Service role bypasses RLS, so no policy needed for the sync job itself.
--- Deny everything for regular users.
-create policy "No public access to sync_log"
-  on sync_log for select using (false);
+drop policy if exists "No public access to sync_log" on sync_log;
+drop policy if exists "Admins can read sync log" on sync_log;
+create policy "Admins can read sync log"
+  on sync_log for select using (public.is_admin());

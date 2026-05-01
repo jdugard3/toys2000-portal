@@ -32,7 +32,7 @@ export default async function BrandCatalogPage({ params }) {
       .eq('manufacturer_id', manufacturerID)
       .eq('show_on_website', true)
       .eq('discontinued', false)
-      .order('name')
+      .order('record_id')
       .range(0, 47),
     supabase.from('manufacturers').select('manufacturer_id, name').order('name'),
   ]);

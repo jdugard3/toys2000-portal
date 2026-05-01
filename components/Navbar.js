@@ -17,7 +17,6 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => setUser(data?.user ?? null));
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);

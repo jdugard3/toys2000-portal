@@ -27,7 +27,7 @@ export default async function CatalogPage({ searchParams }) {
     .select('*', { count: 'exact' })
     .eq('show_on_website', true)
     .eq('discontinued', false)
-    .order('name')
+    .order('record_id')
     .range(0, 47);
 
   if (manufacturerID) query = query.eq('manufacturer_id', manufacturerID);

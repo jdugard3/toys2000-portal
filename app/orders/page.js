@@ -25,7 +25,6 @@ export default async function OrdersPage() {
     try {
       const result = await getOrders({
         retailerID: profile.retailer_id,
-        repGroupID: process.env.MT_REP_GROUP_ID,
       });
       orders = Array.isArray(result) ? result : result?.records ?? [];
     } catch (err) {

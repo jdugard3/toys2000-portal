@@ -1,7 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-const PUBLIC_PATHS = ['/', '/login', '/api/auth'];
+// Let route handlers enforce API auth themselves so service-to-service calls
+// (catalog sync, admin mutations, MarketTime proxies) return JSON instead of
+// being redirected to /login by the page auth guard.
+const PUBLIC_PATHS = ['/', '/login', '/api'];
 
 export async function proxy(req) {
   const res = NextResponse.next({

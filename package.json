@@ -2,10 +2,13 @@
   "name": "toys2000-portal",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "sync:mt": "node --env-file=.env scripts/sync-markettime.js",
+    "sync:customers": "node --env-file=.env scripts/sync-markettime-customers.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
