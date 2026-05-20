@@ -168,6 +168,24 @@ as $$
   );
 $$;
 
+-- Approved-retailer gate. Used by every customer-facing RLS policy below so a
+-- signed-up-but-unapproved account cannot read catalog data, write to the
+-- cart, or otherwise touch the system before Jimmy reviews them in MarketTime.
+-- SECURITY DEFINER mirrors is_admin() for the same recursive-policy reason.
+create or replace function public.is_approved(user_id uuid default auth.uid())
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = user_id
+      and approved = true
+  );
+$$;
+
 -- profiles: users can read their own row. Admins can read/update all profiles.
 -- Do not allow regular users to update their own profile row because that would
 -- allow privilege escalation via is_admin/approved/retailer_id.
@@ -185,20 +203,28 @@ create policy "Admins can view all profiles"
 create policy "Admins can update all profiles"
   on profiles for update using (public.is_admin()) with check (public.is_admin());
 
--- cart_items: users can only see and manage their own cart
+-- cart_items: users can only see and manage their own cart, AND must be an
+-- approved retailer. Admins are implicitly approved (set both flags together).
 drop policy if exists "Users manage own cart" on cart_items;
 create policy "Users manage own cart"
-  on cart_items for all using (auth.uid() = user_id);
+  on cart_items for all
+  using (auth.uid() = user_id and public.is_approved())
+  with check (auth.uid() = user_id and public.is_approved());
 
--- products: anyone authenticated can read (browsing is auth-gated via middleware)
+-- products: approved retailers (and admins) can read. Unapproved users get an
+-- empty result set even if they fish for IDs.
 drop policy if exists "Authenticated users can read products" on products;
-create policy "Authenticated users can read products"
-  on products for select using (auth.role() = 'authenticated');
+drop policy if exists "Approved users can read products" on products;
+create policy "Approved users can read products"
+  on products for select
+  using (public.is_approved() or public.is_admin());
 
--- manufacturers: same
+-- manufacturers: same gate as products.
 drop policy if exists "Authenticated users can read manufacturers" on manufacturers;
-create policy "Authenticated users can read manufacturers"
-  on manufacturers for select using (auth.role() = 'authenticated');
+drop policy if exists "Approved users can read manufacturers" on manufacturers;
+create policy "Approved users can read manufacturers"
+  on manufacturers for select
+  using (public.is_approved() or public.is_admin());
 
 -- sync_log: admin only (via service role in sync routes)
 -- Service role bypasses RLS, so no policy needed for the sync job itself.

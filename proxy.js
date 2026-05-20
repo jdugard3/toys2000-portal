@@ -6,6 +6,10 @@ import { NextResponse } from 'next/server';
 // being redirected to /login by the page auth guard.
 const PUBLIC_PATHS = ['/', '/login', '/api'];
 
+// Pages an authenticated-but-unapproved user is allowed to view.
+// Everything else requires `profiles.approved = true`.
+const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/api'];
+
 export async function proxy(req) {
   const res = NextResponse.next({
     request: { headers: req.headers },
@@ -20,7 +24,7 @@ export async function proxy(req) {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             req.cookies.set(name, value)
           );
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -31,16 +35,43 @@ export async function proxy(req) {
     }
   );
 
-  // Refresh session if expired — required for Server Components
-  const { data: { session } } = await supabase.auth.getSession();
+  // IMPORTANT: use getUser() rather than getSession(). getSession() reads the JWT
+  // from cookies without validating it against the auth server, so a tampered or
+  // stale cookie can satisfy the auth check. getUser() round-trips to Supabase
+  // and is the only safe primitive to use in server-side auth gates.
+  // See: https://supabase.com/docs/guides/auth/server-side/nextjs
+  const { data: { user } } = await supabase.auth.getUser();
 
   const pathname = req.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 
-  if (!session && !isPublic) {
+  if (!user && !isPublic) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Enforce the "approved retailer" business rule at the edge. Without this,
+  // anyone who signs up can browse the catalog before Jimmy reviews them in MT.
+  // The catalog/cart/checkout RLS policies also enforce this server-side, but
+  // redirecting at the proxy avoids leaking page shells and 401 noise.
+  if (user) {
+    const isExempt = APPROVAL_EXEMPT_PATHS.some(
+      (p) => pathname === p || pathname.startsWith(p + '/')
+    );
+
+    if (!isExempt) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.approved) {
+        const pendingUrl = new URL('/pending-approval', req.url);
+        return NextResponse.redirect(pendingUrl);
+      }
+    }
   }
 
   return res;

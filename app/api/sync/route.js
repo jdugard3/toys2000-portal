@@ -131,9 +131,13 @@ async function runSync({ modifiedStartDate, isFull }) {
         break;
       }
 
-      // Filter out discontinued and hidden items before storing
+      // Upsert ALL records returned by MarketTime, including discontinued and
+      // hidden ones. Filtering them out here would freeze stale rows in the
+      // products table forever (an item that flipped from active to
+      // discontinued would never get its discontinued flag updated). The
+      // customer-facing /api/catalog query already filters these out, so
+      // storing the full snapshot is safe and is required for correctness.
       const productRows = records
-        .filter((item) => !item.discontinued && item.showOnWebsite !== false)
         .map((item) => ({
           record_id: item.recordID,
           item_number: item.itemNumber,

@@ -194,9 +194,13 @@ async function main() {
         break;
       }
 
-      const products = records
-        .filter((item) => !item.discontinued && item.showOnWebsite !== false)
-        .map(mapProduct);
+      // Upsert ALL records returned by MarketTime, including discontinued and
+      // hidden ones. The previous version filtered these out before the upsert,
+      // which meant items that flipped from active -> discontinued kept their
+      // stale `discontinued = false` row forever and stayed visible in the
+      // catalog. The customer-facing /api/catalog query already filters on
+      // show_on_website and discontinued, so storing them is safe.
+      const products = records.map(mapProduct);
 
       if (products.length) {
         await upsertManufacturerPlaceholders(products);
