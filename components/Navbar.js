@@ -7,6 +7,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
+// Pages where the navbar floats transparent over a full-bleed hero image.
+// body.has-hero-nav is set so the CSS in components.css can style links white.
+const HERO_PATHS = ['/', '/catalog'];
+
 export default function Navbar({ cartCount = 0, onCartOpen }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -15,13 +19,25 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
   const pathname = usePathname();
   const supabase = createBrowserClient();
 
+  const isHeroPage = HERO_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + '/')
+  );
+
+  // Toggle body.has-hero-nav so the transparent-navbar CSS rule fires
+  useEffect(() => {
+    if (isHeroPage) {
+      document.body.classList.add('has-hero-nav');
+    } else {
+      document.body.classList.remove('has-hero-nav');
+    }
+    return () => document.body.classList.remove('has-hero-nav');
+  }, [isHeroPage]);
+
   useEffect(() => {
     if (!supabase) return;
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
     });
-
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
 
@@ -31,7 +47,6 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => setMobileOpen(false), [pathname]);
 
   const handleSignOut = async () => {
@@ -44,99 +59,81 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
 
   return (
     <>
-      <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
-        }`}
-        style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
-            <Image
-              src="/logos/toys_2000_logo.png"
-              alt="Toys2000"
-              width={140}
-              height={46}
-              className="h-10 w-auto object-contain"
-              priority
-            />
-          </Link>
+      <nav className={`navbar${scrolled ? ' navbar-scrolled' : ''}`}>
+        <div className="nav-row">
 
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link
-              href="/catalog"
-              className="text-sm font-semibold text-[#1a1d26] hover:text-[#f15a24] transition-colors"
-            >
-              Shop All
-            </Link>
-            <Link
-              href="/catalog"
-              className="text-sm font-semibold text-[#1a1d26] hover:text-[#f15a24] transition-colors"
-            >
-              Brands
-            </Link>
-            {user && (
-              <Link
-                href="/orders"
-                className="text-sm font-semibold text-[#1a1d26] hover:text-[#f15a24] transition-colors"
-              >
-                My Orders
-              </Link>
-            )}
+          {/* ── Left nav links ── */}
+          <div className="nav-group nav-group-left">
+            <div className="nav-links">
+              <Link href="/catalog" className="nav-link">Shop All</Link>
+              <Link href="/catalog" className="nav-link">Brands</Link>
+              {user && (
+                <Link href="/orders" className="nav-link">My Orders</Link>
+              )}
+            </div>
           </div>
 
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {/* Cart button */}
-            {user && (
-              <button
-                onClick={onCartOpen}
-                className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-[#1a1d26] hover:bg-[#f7f8fa] transition-colors"
-                aria-label="Open cart"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold" style={{ background: '#f15a24' }}>
+          {/* ── Center logo — overflows the navbar ── */}
+          <div className="nav-center">
+            <Link href="/" className="nav-master-logo" aria-label="Toys2000 home">
+              <Image
+                src="/logos/toys_2000_logo.png"
+                alt="Toys2000"
+                width={180}
+                height={150}
+                className="nav-master-logo-img"
+                priority
+              />
+            </Link>
+          </div>
+
+          {/* ── Right actions ── */}
+          <div className="nav-group nav-group-right">
+            {user ? (
+              <>
+                {/* Cart */}
+                <button
+                  onClick={onCartOpen}
+                  className="nav-cart-btn"
+                  aria-label="Open cart"
+                >
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className={`cart-badge${cartCount === 0 ? ' hidden' : ''}`}>
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
-                )}
-              </button>
-            )}
+                </button>
 
-            {/* Auth */}
-            {user ? (
-              <button
-                onClick={handleSignOut}
-                className="hidden md:block text-sm font-semibold text-[#5f6980] hover:text-[#f15a24] transition-colors"
-              >
-                Sign out
-              </button>
+                {/* Sign out */}
+                <button
+                  onClick={handleSignOut}
+                  className="nav-link"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Sign out
+                </button>
+              </>
             ) : (
-              <Link
-                href="/login"
-                className="hidden md:block text-sm font-semibold text-white px-4 py-2 rounded-lg transition-all"
-                style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)' }}
-              >
+              <Link href="/login" className="nav-quote-btn">
                 Sign in
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             )}
 
             {/* Mobile hamburger */}
             <button
-              className="md:hidden p-2 rounded-lg text-[#1a1d26] hover:bg-[#f7f8fa]"
+              className="nav-cart-btn md:hidden"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Toggle menu"
+              style={{ display: 'none' }}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                {mobileOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                )}
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {mobileOpen
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
               </svg>
             </button>
           </div>
@@ -144,26 +141,36 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-black/[0.06] bg-white px-4 py-4 space-y-3">
-            <Link href="/catalog" className="block text-sm font-semibold text-[#1a1d26] py-2">Shop All</Link>
-            <Link href="/catalog" className="block text-sm font-semibold text-[#1a1d26] py-2">Brands</Link>
-            {user && (
-              <Link href="/orders" className="block text-sm font-semibold text-[#1a1d26] py-2">My Orders</Link>
-            )}
-            <div className="pt-2 border-t border-black/[0.06]">
+          <div
+            style={{
+              borderTop: '1px solid var(--glass-border)',
+              background: 'white',
+              padding: '16px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            <Link href="/catalog" className="nav-link" style={{ padding: '8px 0' }}>Shop All</Link>
+            <Link href="/catalog" className="nav-link" style={{ padding: '8px 0' }}>Brands</Link>
+            {user && <Link href="/orders" className="nav-link" style={{ padding: '8px 0' }}>My Orders</Link>}
+            <div style={{ paddingTop: '12px', borderTop: '1px solid var(--glass-border)' }}>
               {user ? (
-                <button onClick={handleSignOut} className="text-sm font-semibold text-[#5f6980]">
+                <button onClick={handleSignOut} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0' }}>
                   Sign out
                 </button>
               ) : (
-                <Link href="/login" className="text-sm font-semibold text-[#f15a24]">Sign in</Link>
+                <Link href="/login" className="nav-quote-btn" style={{ width: '100%', justifyContent: 'center' }}>
+                  Sign in
+                </Link>
               )}
             </div>
           </div>
         )}
       </nav>
-      {/* Spacer so content doesn't hide under fixed nav */}
-      <div className="h-16" />
+
+      {/* Spacer — only for non-hero pages (hero pages intentionally go under the navbar) */}
+      {!isHeroPage && <div style={{ height: '96px' }} />}
     </>
   );
 }

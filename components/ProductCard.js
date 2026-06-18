@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/cart';
@@ -7,75 +8,100 @@ import { formatCurrency } from '@/lib/cart';
 export default function ProductCard({ product, onQuickView }) {
   const {
     record_id,
-    item_number,
     name,
     manufacturer_name,
     unit_price,
     primary_image_url,
     is_available,
-    discontinued,
     discount_percent,
     minimum_quantity,
   } = product;
 
+  const [inView, setInView] = useState(false);
+  const cardRef = useRef(null);
+
+  // Scroll-in animation — adds .in-view when card enters the viewport
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const hasDiscount = discount_percent > 0;
 
   return (
-    <div className="group relative bg-white rounded-2xl border border-black/[0.06] overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col">
-      {/* Image */}
-      <Link href={`/product/${record_id}`} className="block relative aspect-square overflow-hidden bg-[#f7f8fa]">
-        {primary_image_url ? (
-          <Image
-            src={primary_image_url}
-            alt={name}
-            fill
-            className="object-contain p-3 group-hover:scale-105 transition-transform duration-300"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-[#5f6980] text-xs">
-            No image
-          </div>
+    <div ref={cardRef} className={`product-card${inView ? ' in-view' : ''}`}>
+      {/* Image area */}
+      <div className="product-image-container">
+        <Link href={`/product/${record_id}`} style={{ display: 'block', height: '100%' }}>
+          {primary_image_url ? (
+            <Image
+              src={primary_image_url}
+              alt={name}
+              fill
+              className="product-image"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            />
+          ) : (
+            <div
+              style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-secondary)', fontSize: '0.8rem',
+                background: 'var(--bg-surface)',
+              }}
+            >
+              No image
+            </div>
+          )}
+        </Link>
+
+        {/* Discount badge */}
+        {hasDiscount && (
+          <span className="fp-badge fp-badge-promo">{discount_percent}% off</span>
         )}
 
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {hasDiscount && (
-            <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: '#f15a24' }}>
-              {discount_percent}% off
-            </span>
-          )}
-          {!is_available && (
-            <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full bg-gray-400">
-              Out of stock
-            </span>
-          )}
-        </div>
+        {/* Out of stock badge */}
+        {!is_available && (
+          <span className="fp-badge" style={{ background: '#9ca3af', color: 'white', borderColor: '#9ca3af' }}>
+            Out of stock
+          </span>
+        )}
 
         {/* Quick view on hover */}
         <button
-          onClick={(e) => {
-            e.preventDefault();
-            onQuickView?.(product);
-          }}
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 text-xs font-semibold text-white px-3 py-1.5 rounded-full whitespace-nowrap"
-          style={{ background: 'rgba(26,29,38,0.85)' }}
+          className="product-quickview-btn"
+          onClick={(e) => { e.preventDefault(); onQuickView?.(product); }}
         >
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
           Quick view
         </button>
-      </Link>
+      </div>
 
-      {/* Info */}
-      <div className="p-3 flex flex-col gap-1 flex-1">
-        <p className="text-xs text-[#5f6980]">{manufacturer_name}</p>
-        <Link href={`/product/${record_id}`} className="text-sm font-semibold text-[#1a1d26] leading-snug hover:text-[#f15a24] line-clamp-2">
-          {name}
+      {/* Text info */}
+      <div className="product-info">
+        <p className="product-brand-tag">{manufacturer_name}</p>
+        <Link href={`/product/${record_id}`} style={{ textDecoration: 'none' }}>
+          <h3 className="product-title">{name}</h3>
         </Link>
-        <div className="mt-auto pt-2 flex items-baseline gap-2">
-          <span className="font-bold text-[#1a1d26]">{formatCurrency(unit_price)}</span>
+        <div className="product-price-row">
+          <span className="product-price">{formatCurrency(unit_price)}</span>
           {minimum_quantity > 1 && (
-            <span className="text-xs text-[#5f6980]">min {minimum_quantity}</span>
+            <span className="product-bulk-price">min {minimum_quantity}</span>
           )}
+        </div>
+        <div className="product-actions">
+          <Link href={`/product/${record_id}`} className="btn btn-primary" style={{ fontSize: '0.9rem', padding: '10px 16px' }}>
+            View product
+          </Link>
         </div>
       </div>
     </div>
