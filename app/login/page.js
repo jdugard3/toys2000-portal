@@ -36,6 +36,9 @@ function LoginForm() {
         toast.success('MarketTime account linked.');
       } else if (data.linked && !data.approved) {
         toast('MarketTime account found, but it is still pending approval.');
+      } else if (data.reason === 'api_error') {
+        // Non-fatal — catalog still works from Supabase
+        console.warn('MarketTime link skipped:', data.message);
       }
     } catch {
       // Linking is best-effort; customers can still browse while pending.
@@ -93,30 +96,46 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f7f8fa] px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(160deg, #f7f8fa 0%, #eef0f4 40%, #fff5f0 100%)',
+        }}
+      />
+      <div
+        className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-30 blur-3xl"
+        style={{ background: '#00aeef' }}
+      />
+      <div
+        className="absolute -bottom-32 -left-24 w-96 h-96 rounded-full opacity-25 blur-3xl"
+        style={{ background: '#f15a24' }}
+      />
+
+      <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <a href="/">
+          <a href="/" className="block transition-transform hover:scale-[1.02]">
             <Image
               src="/logos/toys_2000_logo.png"
               alt="Toys2000"
-              width={180}
-              height={60}
-              className="h-14 w-auto object-contain"
+              width={200}
+              height={68}
+              className="h-16 w-auto object-contain drop-shadow-sm"
               priority
             />
           </a>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-8">
+        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border border-black/[0.06] p-8 sm:p-10">
           <h1
-            className="text-2xl font-bold text-center mb-1"
+            className="text-2xl sm:text-3xl font-bold text-center mb-1 text-[#1a1d26]"
             style={{ fontFamily: "'Baloo 2', cursive" }}
           >
             {mode === 'login' ? 'Welcome back' : 'Create account'}
           </h1>
-          <p className="text-sm text-[#5f6980] text-center mb-6">
+          <p className="text-sm text-[#5f6980] text-center mb-8">
             {mode === 'login'
               ? 'Sign in to your wholesale account'
               : 'Set up your portal login'}
@@ -138,7 +157,7 @@ function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#f15a24]/30 focus:border-[#f15a24] transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#f15a24]/25 focus:border-[#f15a24] transition-all"
                 placeholder="you@company.com"
                 autoComplete="email"
               />
@@ -153,7 +172,7 @@ function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#f15a24]/30 focus:border-[#f15a24] transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#f15a24]/25 focus:border-[#f15a24] transition-all"
                 placeholder="••••••••"
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
@@ -174,7 +193,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-60"
+              className="w-full py-3 px-4 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-60 hover:shadow-lg hover:-translate-y-0.5"
               style={{
                 background: 'linear-gradient(135deg, #f15a24, #ff7a4d)',
                 boxShadow: '0 4px 12px rgba(241, 90, 36, 0.25)',
@@ -224,8 +243,8 @@ function LoginForm() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-[#5f6980] mt-6">
-          Toys2000 Wholesale Portal &mdash; For approved retailers only
+        <p className="text-center text-xs text-[#8b94a8] mt-8">
+          Toys2000 Wholesale Portal — For approved retailers only
         </p>
       </div>
     </div>

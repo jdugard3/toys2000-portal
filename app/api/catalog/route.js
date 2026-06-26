@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
+import { CATALOG_PRODUCT_SELECT } from '@/lib/catalog';
 
 /**
  * GET /api/catalog
@@ -17,8 +18,8 @@ import { NextResponse } from 'next/server';
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -32,7 +33,7 @@ export async function GET(request) {
 
   let query = supabase
     .from('products')
-    .select('*', { count: 'exact' })
+    .select(CATALOG_PRODUCT_SELECT, { count: 'exact' })
     .eq('show_on_website', true)
     .eq('discontinued', false)
     .range(offset, offset + limit - 1)
@@ -47,7 +48,8 @@ export async function GET(request) {
   }
 
   if (search) {
-    query = query.textSearch('name', search, { type: 'websearch', config: 'english' });
+    const term = search.replace(/[%_]/g, '\\$&');
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
   }
 
   const { data, error, count } = await query;

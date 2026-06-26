@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { snapQuantity, isValidQuantity, formatCurrency } from '@/lib/cart';
 import { useCart } from '@/components/CartProvider';
 import ProductCard from '@/components/ProductCard';
+import ProductDescription from '@/components/ProductDescription';
 
 export default function ProductDetail({ product, related }) {
   const {
@@ -208,7 +209,7 @@ export default function ProductDetail({ product, related }) {
             {description && (
               <div className="border-t border-black/[0.06] pt-5">
                 <h2 className="text-sm font-bold text-[#1a1d26] mb-2">Description</h2>
-                <p className="text-sm text-[#5f6980] leading-relaxed">{description}</p>
+                <ProductDescription description={description} />
               </div>
             )}
           </div>

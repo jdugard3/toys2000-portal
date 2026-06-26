@@ -2,9 +2,9 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 import { redirect, notFound } from 'next/navigation';
-import { getOrders, getOrderTracking } from '@/lib/markettime';
+import { getOrderByRecordId, getOrderTracking } from '@/lib/markettime';
 import Link from 'next/link';
-import { formatCurrency, getOrderStatusLabel, ORDER_STATUS_LABELS } from '@/lib/cart';
+import { formatCurrency, getOrderStatusLabel, ORDER_STATUS_LABELS, normalizeOrderStatus } from '@/lib/cart';
 
 export const metadata = { title: 'Order Detail — Toys2000 Wholesale' };
 
@@ -19,29 +19,23 @@ const STATUS_COLORS = {
 export default async function OrderDetailPage({ params }) {
   const { orderID } = await params;
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login?redirect=/orders');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?redirect=/orders');
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('retailer_id')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
   if (!profile?.retailer_id) redirect('/orders');
 
-  // Fetch this specific order — MT doesn't have GET /orders/{id} directly,
-  // so we filter the list by recordID
+  // MT has no GET /orders/{id}; recordID filters on orders/get are ignored.
   let order = null;
   let tracking = null;
 
   try {
-    const orders = await getOrders({
-      retailerID: profile.retailer_id,
-      recordID: orderID,
-    });
-    const list = Array.isArray(orders) ? orders : orders?.records ?? [];
-    order = list.find((o) => String(o.recordID ?? o.id) === String(orderID));
+    order = await getOrderByRecordId(profile.retailer_id, orderID);
   } catch {
     notFound();
   }
@@ -97,7 +91,8 @@ export default async function OrderDetailPage({ params }) {
             <div className="flex items-center gap-0">
               {Object.entries(ORDER_STATUS_LABELS).map(([status, displayLabel], i, arr) => {
                 const statuses = Object.keys(ORDER_STATUS_LABELS);
-                const currentIdx = statuses.indexOf(order.manufacturerOrderStatus);
+                const currentStatus = normalizeOrderStatus(order.manufacturerOrderStatus);
+                const currentIdx = statuses.indexOf(currentStatus);
                 const stepIdx = statuses.indexOf(status);
                 const isDone = stepIdx <= currentIdx;
                 const isLast = i === arr.length - 1;

@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { CATALOG_PRODUCT_SELECT } from '@/lib/catalog';
 
 export const dynamic = 'force-dynamic';
 import { redirect, notFound } from 'next/navigation';
@@ -18,8 +19,8 @@ export default async function BrandCatalogPage({ params }) {
   const { brand } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect(`/login?redirect=/catalog/${brand}`);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect(`/login?redirect=/catalog/${brand}`);
 
   // Brand param is the manufacturer_id (e.g. "M999864")
   const manufacturerID = decodeURIComponent(brand);
@@ -28,7 +29,7 @@ export default async function BrandCatalogPage({ params }) {
     supabase.from('manufacturers').select('*').eq('manufacturer_id', manufacturerID).single(),
     supabase
       .from('products')
-      .select('*', { count: 'exact' })
+      .select(CATALOG_PRODUCT_SELECT, { count: 'exact' })
       .eq('manufacturer_id', manufacturerID)
       .eq('show_on_website', true)
       .eq('discontinued', false)
@@ -55,7 +56,8 @@ export default async function BrandCatalogPage({ params }) {
               alt={manufacturer.name}
               width={120}
               height={60}
-              className="h-14 w-auto object-contain"
+              className="object-contain"
+              style={{ width: 'auto', height: '3.5rem' }}
             />
           )}
           <div>

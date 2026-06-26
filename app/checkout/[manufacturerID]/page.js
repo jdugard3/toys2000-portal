@@ -11,7 +11,7 @@ export default async function CheckoutPage({ params }) {
   const supabase = await createServerSupabaseClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login?redirect=/cart');
+  if (!user) redirect(`/login?redirect=/checkout/${manufacturerID}`);
 
   const { data: profile } = await supabase
     .from('profiles')

@@ -8,14 +8,14 @@ export const metadata = { title: 'Admin — Toys2000 Wholesale' };
 
 export default async function AdminPage() {
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login?redirect=/admin');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?redirect=/admin');
 
   // Check is_admin on profiles — gated here server-side
   const { data: profile } = await supabase
     .from('profiles')
     .select('is_admin')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
   if (!profile?.is_admin) redirect('/catalog');

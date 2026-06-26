@@ -9,8 +9,8 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const supabase = await createServerSupabaseClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

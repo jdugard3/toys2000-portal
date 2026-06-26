@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { CATALOG_PRODUCT_SELECT } from '@/lib/catalog';
 
 export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
@@ -6,25 +7,29 @@ import CatalogGrid from './CatalogGrid';
 
 export const metadata = { title: 'Catalog — Toys2000 Wholesale' };
 
-/**
- * Server Component — queries Supabase directly at render time.
- * Does NOT call /api/catalog. That route exists for client-side
- * search/filter/pagination only.
- */
 export default async function CatalogPage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login?redirect=/catalog');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?redirect=/catalog');
 
   const params = await searchParams;
-  const manufacturerID = params.manufacturer_id || null;
+  let manufacturerID = params.manufacturer_id || null;
   const category = params.category || null;
   const search = params.search || null;
 
-  // Initial server-side fetch (first page)
+  // Home page brand tiles link with ?brand=Airhead — resolve to manufacturer_id
+  if (!manufacturerID && params.brand) {
+    const { data: mfr } = await supabase
+      .from('manufacturers')
+      .select('manufacturer_id')
+      .ilike('name', params.brand)
+      .maybeSingle();
+    manufacturerID = mfr?.manufacturer_id ?? null;
+  }
+
   let query = supabase
     .from('products')
-    .select('*', { count: 'exact' })
+    .select(CATALOG_PRODUCT_SELECT, { count: 'exact' })
     .eq('show_on_website', true)
     .eq('discontinued', false)
     .order('record_id')
@@ -32,7 +37,10 @@ export default async function CatalogPage({ searchParams }) {
 
   if (manufacturerID) query = query.eq('manufacturer_id', manufacturerID);
   if (category) query = query.ilike('rep_group_category_path', `%${category}%`);
-  if (search) query = query.textSearch('name', search, { type: 'websearch', config: 'english' });
+  if (search) {
+    const term = search.replace(/[%_]/g, '\\$&');
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
 
   const [productsResult, manufacturersResult] = await Promise.all([
     query,
@@ -44,8 +52,8 @@ export default async function CatalogPage({ searchParams }) {
   const manufacturers = manufacturersResult.data ?? [];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen bg-[#f7f8fa] products-page">
+      <div className="products-layout-container">
         <div className="flex items-end justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-[#1a1d26]" style={{ fontFamily: "'Baloo 2', cursive" }}>

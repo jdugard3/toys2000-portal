@@ -49,8 +49,11 @@
   --color-text-secondary: #5f6980;
 }
 
-/* ── Base reset ───────────────────────────────────────────────── */
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Base reset ─────────────────────────────────────────────────
+   Do NOT zero margin/padding on * — that strips Tailwind utility
+   classes (px-4, py-8, gap-*, etc.) and breaks page layouts.
+   ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   font-family: var(--font-body);
@@ -67,7 +70,23 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-a { color: var(--secondary-color); text-decoration: none; }
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Button-styled links must keep white text — do not inherit link blue */
+a.btn,
+a.btn-primary,
+a.btn-secondary,
+a.btn-outline,
+a.btn-hero-primary,
+a.btn-hero-secondary,
+a.nav-quote-btn,
+a.cart-checkout-btn,
+a.cart-shop-btn {
+  color: white;
+}
 
 ::selection {
   background: rgba(241, 90, 36, 0.15);
@@ -149,3 +168,12 @@ a { color: var(--secondary-color); text-decoration: none; }
 @import './styles/products.css';
 @import './styles/modals.css';
 @import './styles/checkout.css';
+
+/* Product cards should be visible immediately — scroll animation is optional */
+.product-card { opacity: 1; transform: none; }
+
+/* Show mobile menu button below 1024px (matches components.css breakpoint) */
+@media (max-width: 1024px) {
+  :root { --show-mobile-menu: flex; }
+  .nav-group-left .nav-links { display: none; }
+}

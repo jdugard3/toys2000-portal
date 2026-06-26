@@ -59,13 +59,23 @@ async function findCustomerByEmail(email) {
 
 export async function POST() {
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session?.user?.email) {
+  if (!user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const customer = await findCustomerByEmail(session.user.email);
+  let customer;
+  try {
+    customer = await findCustomerByEmail(user.email);
+  } catch (err) {
+    console.error('[/api/profile/link-markettime]', err.message);
+    return NextResponse.json({
+      linked: false,
+      reason: 'api_error',
+      message: 'Could not reach MarketTime to link your account. You can still browse the catalog.',
+    });
+  }
 
   if (!customer) {
     return NextResponse.json({
@@ -81,7 +91,7 @@ export async function POST() {
   const { error } = await admin
     .from('profiles')
     .upsert({
-      id: session.user.id,
+      id: user.id,
       retailer_id: customer.recordID,
       company_name: customer.name ?? customer.dba ?? null,
       approved,

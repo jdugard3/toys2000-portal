@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getOrders } from '@/lib/markettime';
 import OrderCard from '@/components/OrderCard';
 
@@ -9,13 +10,13 @@ export const metadata = { title: 'My Orders — Toys2000 Wholesale' };
 
 export default async function OrdersPage() {
   const supabase = await createServerSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login?redirect=/orders');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login?redirect=/orders');
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('retailer_id, company_name')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
   let orders = [];
@@ -59,9 +60,13 @@ export default async function OrdersPage() {
           <div className="bg-white rounded-2xl border border-black/[0.06] p-12 text-center">
             <p className="text-[#5f6980] font-medium">No orders yet.</p>
             <p className="text-sm text-[#5f6980] mt-1">Place your first order from the catalog.</p>
-            <a href="/catalog" className="inline-block mt-4 px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)' }}>
+            <Link
+              href="/catalog"
+              className="inline-block mt-4 px-5 py-2.5 rounded-xl text-sm font-bold text-white no-underline"
+              style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', color: '#ffffff' }}
+            >
               Browse Catalog
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">

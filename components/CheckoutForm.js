@@ -7,7 +7,9 @@ import { getVendorMinimum, meetsVendorMinimum } from '@/lib/vendor-minimums';
 import FreightNudge from './FreightNudge';
 import toast from 'react-hot-toast';
 
-export default function CheckoutForm({ group, customer, shipTos = [], shippingMethods = [], onSuccess }) {
+import { getShipToRecordId } from '@/lib/build-markettime-order';
+
+export default function CheckoutForm({ group, customer, shipTos = [], shippingMethods = [], dataError, onSuccess }) {
   const { manufacturerID, manufacturerName, items } = group;
 
   const [poNumber, setPoNumber] = useState('');
@@ -26,9 +28,11 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
 
   useEffect(() => {
     setPoNumber(generatePO());
-    if (shipTos.length > 0) setShipToID(String(shipTos[0]?.retailerShipToID ?? shipTos[0]?.id ?? ''));
+    if (shipTos.length > 0) setShipToID(String(getShipToRecordId(shipTos[0]) ?? ''));
     if (shippingMethods.length > 0) setShippingMethod(shippingMethods[0]?.shippingMethod ?? shippingMethods[0]?.name ?? '');
   }, [shipTos, shippingMethods]);
+
+  const activeShipToID = shipToID || String(getShipToRecordId(shipTos[0]) ?? '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +42,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
       return;
     }
 
-    if (!shipToID) {
+    if (!activeShipToID) {
       toast.error('Please select a ship-to address.');
       return;
     }
@@ -47,7 +51,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
 
     const payload = {
       manufacturerID,
-      retailerShipToID: parseInt(shipToID, 10),
+      retailerShipToID: parseInt(activeShipToID, 10),
       poNumber: poNumber.trim(),
       shippingMethod,
       shipDate: shipDate || undefined,
@@ -57,6 +61,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
       requestDate: new Date().toISOString(),
       details: items.map((item) => ({
         itemNumber: item.item_number,
+        name: item.name,
         quantity: item.quantity,
         unitPrice: item.unit_price,
         unitQty: item.unit_qty ?? item.quantity,
@@ -141,23 +146,36 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
       </div>
 
       {/* Ship-to address */}
-      {shipTos.length > 0 && (
+      {dataError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <p className="font-semibold">Could not load shipping options</p>
+          <p className="mt-1">{dataError}</p>
+          <p className="mt-2 text-xs text-red-600">
+            Restart the dev server after updating your MarketTime API key in <code>.env.local</code>.
+          </p>
+        </div>
+      )}
+
+      {shipTos.length > 0 ? (
         <div className="bg-white rounded-2xl border border-black/[0.06] p-5 space-y-4">
           <h3 className="font-bold text-[#1a1d26]" style={{ fontFamily: "'Baloo 2', cursive" }}>Shipping</h3>
 
           <div>
             <label className="block text-sm font-medium text-[#1a1d26] mb-1.5">Ship-to address</label>
             <select
-              value={shipToID}
+              value={activeShipToID}
               onChange={(e) => setShipToID(e.target.value)}
               required
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#f15a24]"
             >
-              {shipTos.map((s, index) => (
-                <option key={s.retailerShipToID ?? s.id ?? index} value={s.retailerShipToID ?? s.id}>
-                  {s.addressName || s.address1} — {s.city}, {s.state}
-                </option>
-              ))}
+              {shipTos.map((s, index) => {
+                const id = String(getShipToRecordId(s) ?? '');
+                return (
+                  <option key={id || index} value={id}>
+                    {s.addressName || s.address1} — {s.city}, {s.state}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -198,6 +216,14 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
               />
             </div>
           </div>
+        </div>
+      ) : !dataError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">No ship-to addresses found</p>
+          <p className="mt-1">
+            Your MarketTime account needs at least one ship-to location before you can place orders.
+            Contact Toys2000 if this looks wrong.
+          </p>
         </div>
       )}
 
@@ -245,7 +271,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitting || belowMinimum}
+        disabled={submitting || belowMinimum || (shipTos.length > 0 && !activeShipToID)}
         className="w-full py-3.5 rounded-xl font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive", fontSize: '1rem' }}
       >

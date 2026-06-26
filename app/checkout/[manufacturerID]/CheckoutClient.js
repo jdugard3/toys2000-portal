@@ -13,6 +13,7 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
   const [shipTos, setShipTos] = useState([]);
   const [shippingMethods, setShippingMethods] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState(null);
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
   const vendorGroup = grouped[manufacturerID];
@@ -21,12 +22,24 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
     if (!profile?.retailer_id) { setDataLoading(false); return; }
 
     Promise.all([
-      fetch(`/api/markettime/customer/${profile.retailer_id}/shiptos`).then((r) => r.json()),
-      fetch(`/api/markettime/manufacturer/${manufacturerID}/shipping`).then((r) => r.json()),
-    ]).then(([shipTosData, shippingData]) => {
-      setShipTos(shipTosData.shipTos ?? []);
-      setShippingMethods(shippingData.shippingMethods ?? []);
-    }).catch(console.error).finally(() => setDataLoading(false));
+      fetch(`/api/markettime/customer/${profile.retailer_id}/shiptos`).then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load ship-to addresses');
+        return data;
+      }),
+      fetch(`/api/markettime/manufacturer/${manufacturerID}/shipping`).then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load shipping methods');
+        return data;
+      }),
+    ])
+      .then(([shipTosData, shippingData]) => {
+        setShipTos(shipTosData.shipTos ?? []);
+        setShippingMethods(shippingData.shippingMethods ?? []);
+        setDataError(null);
+      })
+      .catch((err) => setDataError(err.message))
+      .finally(() => setDataLoading(false));
   }, [profile?.retailer_id, manufacturerID]);
 
   const handleSuccess = async (order) => {
@@ -81,8 +94,8 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen bg-[#f7f8fa] products-page">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pb-12">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-[#5f6980] mb-6">
           <Link href="/cart" className="hover:text-[#f15a24]">← Cart</Link>
@@ -99,6 +112,7 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
           profile={profile}
           shipTos={shipTos}
           shippingMethods={shippingMethods}
+          dataError={dataError}
           onSuccess={handleSuccess}
         />
       </div>

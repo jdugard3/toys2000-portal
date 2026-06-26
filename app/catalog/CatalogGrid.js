@@ -14,6 +14,7 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
   const [filters, setFilters] = useState(initialFilters);
   const [search, setSearch] = useState(initialFilters.search || '');
   const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
   const [isPending, startTransition] = useTransition();
   const { addToCart } = useCart();
 
@@ -27,6 +28,13 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
 
     const res = await fetch(`/api/catalog?${params}`);
     const data = await res.json();
+
+    if (!res.ok) {
+      setFetchError(data.error || 'Failed to load products');
+      return;
+    }
+
+    setFetchError(null);
 
     if (newPage === 1) {
       setProducts(data.products ?? []);
@@ -106,7 +114,11 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
       </div>
 
       {/* Grid */}
-      {isPending && products.length === 0 ? (
+      {fetchError ? (
+        <div className="text-center py-16 text-red-600 bg-red-50 rounded-2xl border border-red-200">
+          <p className="text-lg font-medium">{fetchError}</p>
+        </div>
+      ) : isPending && products.length === 0 ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-2 border-[#f15a24] border-t-transparent rounded-full animate-spin" />
         </div>

@@ -7,9 +7,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
-// Pages where the navbar floats transparent over a full-bleed hero image.
-// body.has-hero-nav is set so the CSS in components.css can style links white.
-const HERO_PATHS = ['/', '/catalog'];
+// Only the home page has a full-bleed hero under the navbar.
+const HERO_PATHS = ['/'];
 
 export default function Navbar({ cartCount = 0, onCartOpen }) {
   const [scrolled, setScrolled] = useState(false);
@@ -35,6 +34,9 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
 
   useEffect(() => {
     if (!supabase) return;
+    supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
+      setUser(currentUser ?? null);
+    });
     const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
     });
@@ -66,7 +68,7 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
           <div className="nav-group nav-group-left">
             <div className="nav-links">
               <Link href="/catalog" className="nav-link">Shop All</Link>
-              <Link href="/catalog" className="nav-link">Brands</Link>
+              <Link href="/catalog/brands" className="nav-link">Brands</Link>
               {user && (
                 <Link href="/orders" className="nav-link">My Orders</Link>
               )}
@@ -82,6 +84,7 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
                 width={180}
                 height={150}
                 className="nav-master-logo-img"
+                style={{ width: 'auto', height: 'auto' }}
                 priority
               />
             </Link>
@@ -125,10 +128,10 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
 
             {/* Mobile hamburger */}
             <button
-              className="nav-cart-btn md:hidden"
+              className="nav-cart-btn"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Toggle menu"
-              style={{ display: 'none' }}
+              style={{ display: 'var(--show-mobile-menu, none)' }}
             >
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 {mobileOpen
@@ -152,7 +155,7 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
             }}
           >
             <Link href="/catalog" className="nav-link" style={{ padding: '8px 0' }}>Shop All</Link>
-            <Link href="/catalog" className="nav-link" style={{ padding: '8px 0' }}>Brands</Link>
+            <Link href="/catalog/brands" className="nav-link" style={{ padding: '8px 0' }}>Brands</Link>
             {user && <Link href="/orders" className="nav-link" style={{ padding: '8px 0' }}>My Orders</Link>}
             <div style={{ paddingTop: '12px', borderTop: '1px solid var(--glass-border)' }}>
               {user ? (
