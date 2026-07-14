@@ -75,13 +75,15 @@ export default function HeroCarousel() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Background slides — all render; CSS opacity drives transitions + Ken Burns */}
+      {/* Background — only load the active slide image (others are multi-MB PNGs) */}
       {SLIDES.map((slide, i) => (
         <div key={i} className={`hero-slide${i === current ? ' active' : ''}`}>
-          <div
-            className="hero-slide-bg"
-            style={{ backgroundImage: `url('${slide.image}')` }}
-          />
+          {i === current && (
+            <div
+              className="hero-slide-bg"
+              style={{ backgroundImage: `url('${slide.image}')` }}
+            />
+          )}
         </div>
       ))}
 

@@ -7,7 +7,7 @@ import { useCart } from '@/components/CartProvider';
 
 const PAGE_SIZE = 48;
 
-export default function CatalogGrid({ initialProducts, initialTotal, manufacturers, initialFilters }) {
+export default function CatalogGrid({ initialProducts, initialTotal, manufacturers, initialFilters, categoryLabel = null, showPrices = true }) {
   const [products, setProducts] = useState(initialProducts);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(1);
@@ -68,6 +68,11 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
     <>
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-black/[0.06] p-4 mb-6 flex flex-wrap gap-3 items-center">
+        {!showPrices && (
+          <p className="w-full text-sm text-[#5f6980] bg-[#f7f8fa] rounded-lg px-3 py-2">
+            Browsing as guest — <a href="/login?redirect=/catalog" className="text-[#00aeef] font-semibold hover:underline">sign in</a> to view wholesale pricing and place orders.
+          </p>
+        )}
         {/* Search */}
         <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[200px]">
           <input
@@ -105,11 +110,17 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
               setSearch('');
               setFilters({ manufacturerID: null, category: null, search: null });
               startTransition(() => fetchProducts({ manufacturerID: null, category: null, search: null }, 1));
+              if (filters.category) window.history.replaceState(null, '', '/catalog');
             }}
             className="text-sm text-[#5f6980] hover:text-[#f15a24] transition-colors"
           >
             Clear filters
           </button>
+        )}
+        {categoryLabel && !filters.manufacturerID && (
+          <span className="text-xs font-semibold text-[#f15a24] bg-[#fff5f0] px-3 py-1.5 rounded-full">
+            {categoryLabel}
+          </span>
         )}
       </div>
 
@@ -134,7 +145,8 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
               <ProductCard
                 key={product.record_id}
                 product={product}
-                onQuickView={setQuickViewProduct}
+                onQuickView={showPrices ? setQuickViewProduct : undefined}
+                showPrices={showPrices}
               />
             ))}
           </div>
@@ -160,6 +172,7 @@ export default function CatalogGrid({ initialProducts, initialTotal, manufacture
         open={!!quickViewProduct}
         onClose={() => setQuickViewProduct(null)}
         onAddToCart={addToCart}
+        showPrices={showPrices}
       />
     </>
   );

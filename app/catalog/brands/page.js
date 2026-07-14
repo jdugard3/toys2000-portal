@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { redirect } from 'next/navigation';
+import { getBrowseAccess, getCatalogDb } from '@/lib/browse-access';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -8,10 +8,10 @@ export const metadata = { title: 'Brands — Toys2000 Wholesale' };
 
 export default async function BrandsPage() {
   const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login?redirect=/catalog/brands');
+  const { showPrices } = await getBrowseAccess(supabase);
+  const db = getCatalogDb(supabase, showPrices);
 
-  const { data: manufacturers } = await supabase
+  const { data: manufacturers } = await db
     .from('manufacturers')
     .select('manufacturer_id, name, logo_url')
     .order('name');

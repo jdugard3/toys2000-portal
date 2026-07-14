@@ -1,13 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { generatePO } from '@/lib/po-number';
 import { formatCurrency, vendorSubtotal } from '@/lib/cart';
-import { getVendorMinimum, meetsVendorMinimum } from '@/lib/vendor-minimums';
+import { getVendorMinimum } from '@/lib/vendor-minimums';
+import { formatPaymentTermsLabel } from '@/lib/payment-terms';
 import FreightNudge from './FreightNudge';
 import toast from 'react-hot-toast';
 
 import { getShipToRecordId } from '@/lib/build-markettime-order';
+
+function getIdempotencyKey(manufacturerID) {
+  const storageKey = `checkout-idempotency-${manufacturerID}`;
+  let key = sessionStorage.getItem(storageKey);
+  if (!key) {
+    key = crypto.randomUUID();
+    sessionStorage.setItem(storageKey, key);
+  }
+  return key;
+}
+
+function clearIdempotencyKey(manufacturerID) {
+  sessionStorage.removeItem(`checkout-idempotency-${manufacturerID}`);
+}
 
 export default function CheckoutForm({ group, customer, shipTos = [], shippingMethods = [], dataError, onSuccess }) {
   const { manufacturerID, manufacturerName, items } = group;
@@ -21,16 +36,38 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [orderPromos, setOrderPromos] = useState([]);
+  const [paymentTermsLabel, setPaymentTermsLabel] = useState('Net 30');
+  const idempotencyKeyRef = useRef(null);
 
   const subtotal = vendorSubtotal(items);
   const minimum = getVendorMinimum(manufacturerID);
   const belowMinimum = minimum > 0 && subtotal < minimum;
 
   useEffect(() => {
+    idempotencyKeyRef.current = getIdempotencyKey(manufacturerID);
+  }, [manufacturerID]);
+
+  useEffect(() => {
     setPoNumber(generatePO());
     if (shipTos.length > 0) setShipToID(String(getShipToRecordId(shipTos[0]) ?? ''));
-    if (shippingMethods.length > 0) setShippingMethod(shippingMethods[0]?.shippingMethod ?? shippingMethods[0]?.name ?? '');
+    if (shippingMethods.length > 0) {
+      setShippingMethod(shippingMethods[0]?.shippingMethod ?? shippingMethods[0]?.name ?? '');
+    } else {
+      setShippingMethod('STANDARD');
+    }
   }, [shipTos, shippingMethods]);
+
+  useEffect(() => {
+    fetch(`/api/markettime/manufacturer/${manufacturerID}/terms`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        setPaymentTermsLabel(formatPaymentTermsLabel(data.terms));
+      })
+      .catch(() => {
+        // Keep Net 30 fallback
+      });
+  }, [manufacturerID]);
 
   const activeShipToID = shipToID || String(getShipToRecordId(shipTos[0]) ?? '');
 
@@ -69,13 +106,18 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
     };
 
     if (notes.trim()) {
-      payload.specialInstructions = `Net 30. ${notes.trim()}`;
+      payload.specialInstructions = `${paymentTermsLabel}. ${notes.trim()}`;
     }
+
+    const idempotencyKey = idempotencyKeyRef.current ?? getIdempotencyKey(manufacturerID);
 
     try {
       const res = await fetch('/api/markettime/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -90,6 +132,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
         setOrderPromos(data.order.orderPromotions);
       }
 
+      clearIdempotencyKey(manufacturerID);
       toast.success(`Order placed with ${manufacturerName}!`);
       onSuccess?.(data.order);
     } catch (err) {
@@ -140,7 +183,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          <p className="text-sm font-semibold text-green-800">Net 30 Terms — No payment required now</p>
+          <p className="text-sm font-semibold text-green-800">{paymentTermsLabel} — No payment required now</p>
           <p className="text-xs text-green-700 mt-0.5">The vendor will contact you directly to arrange payment.</p>
         </div>
       </div>
@@ -148,11 +191,19 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
       {/* Ship-to address */}
       {dataError && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-          <p className="font-semibold">Could not load shipping options</p>
+          <p className="font-semibold">Could not load checkout data</p>
           <p className="mt-1">{dataError}</p>
-          <p className="mt-2 text-xs text-red-600">
-            Restart the dev server after updating your MarketTime API key in <code>.env.local</code>.
-          </p>
+          {dataError.includes('401') && (
+            <p className="mt-2 text-xs text-red-600">
+              Your MarketTime API key may be invalid. Ensure <code>MT_API_KEY</code> in <code>.env.local</code> matches <code>.env</code>, then restart the dev server.
+            </p>
+          )}
+        </div>
+      )}
+
+      {shippingMethods.length === 0 && !dataError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          Shipping methods could not be loaded — defaulting to <strong>STANDARD</strong> freight.
         </div>
       )}
 

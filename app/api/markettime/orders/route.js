@@ -1,6 +1,7 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server';
 import { createOrder, getCustomer, getCustomerShipTos } from '@/lib/markettime';
 import { buildMarketTimeOrder, getShipToRecordId } from '@/lib/build-markettime-order';
+import { validateAndNormalizeOrderDetails } from '@/lib/validate-order';
 import { NextResponse } from 'next/server';
 
 /**
@@ -40,18 +41,32 @@ export async function POST(request) {
     );
   }
 
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim();
+  const db = createAdminClient();
+
+  if (idempotencyKey) {
+    const storageKey = `${user.id}:${idempotencyKey}`;
+    const { data: existing } = await db
+      .from('order_idempotency')
+      .select('order_response')
+      .eq('key', storageKey)
+      .maybeSingle();
+
+    if (existing?.order_response) {
+      return NextResponse.json({ order: existing.order_response });
+    }
+  }
+
   try {
-    const [customer, shipTosRaw] = await Promise.all([
+    const [customer, shipTosRaw, normalizedDetails] = await Promise.all([
       getCustomer(profile.retailer_id),
       getCustomerShipTos(profile.retailer_id),
+      validateAndNormalizeOrderDetails(body.details, body.manufacturerID),
     ]);
 
     const shipToList = Array.isArray(shipTosRaw) ? shipTosRaw : shipTosRaw?.records ?? [];
     const targetShipToId = Number(body.retailerShipToID);
-    const shipTo =
-      shipToList.find((s) => getShipToRecordId(s) === targetShipToId) ??
-      shipToList.find((s) => getShipToRecordId(s) === Number(body.retailerShipToID)) ??
-      shipToList[0];
+    const shipTo = shipToList.find((s) => getShipToRecordId(s) === targetShipToId);
 
     if (!customer) {
       return NextResponse.json({ error: 'MarketTime customer record not found.' }, { status: 404 });
@@ -62,7 +77,7 @@ export async function POST(request) {
 
     const orderPayload = {
       ...buildMarketTimeOrder({
-        clientOrder: body,
+        clientOrder: { ...body, details: normalizedDetails },
         customer,
         shipTo,
         retailerID: profile.retailer_id,
@@ -74,9 +89,22 @@ export async function POST(request) {
     };
 
     const order = await createOrder(orderPayload);
+
+    if (idempotencyKey) {
+      const storageKey = `${user.id}:${idempotencyKey}`;
+      await db.from('order_idempotency').insert({
+        key: storageKey,
+        user_id: user.id,
+        order_response: order,
+      });
+    }
+
     return NextResponse.json({ order });
   } catch (err) {
     console.error('[/api/markettime/orders POST]', err);
-    return NextResponse.json({ error: err.message }, { status: 502 });
+    const status = err.message?.includes('not found') || err.message?.includes('no longer') || err.message?.includes('out of stock') || err.message?.includes('Invalid quantity') || err.message?.includes('must meet minimum')
+      ? 400
+      : 502;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }

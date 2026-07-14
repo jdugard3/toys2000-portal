@@ -46,7 +46,7 @@ export async function POST(request) {
   const syncRes = await fetch(syncUrl.toString(), {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      authorization: `Bearer ${process.env.CRON_SECRET}`,
     },
   });
 

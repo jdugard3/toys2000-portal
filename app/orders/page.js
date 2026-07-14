@@ -4,9 +4,11 @@ export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getOrders } from '@/lib/markettime';
-import OrderCard from '@/components/OrderCard';
+import OrdersList from '@/components/OrdersList';
 
 export const metadata = { title: 'My Orders — Toys2000 Wholesale' };
+
+const PAGE_SIZE = 50;
 
 export default async function OrdersPage() {
   const supabase = await createServerSupabaseClient();
@@ -15,17 +17,19 @@ export default async function OrdersPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('retailer_id, company_name')
+    .select('retailer_id, company_name, approved, is_admin')
     .eq('id', user.id)
     .single();
 
   let orders = [];
   let error = null;
 
-  if (profile?.retailer_id) {
+  if (profile?.retailer_id && (profile.approved || profile.is_admin)) {
     try {
       const result = await getOrders({
         retailerID: profile.retailer_id,
+        offset: 0,
+        recordSize: PAGE_SIZE,
       });
       orders = Array.isArray(result) ? result : result?.records ?? [];
     } catch (err) {
@@ -52,6 +56,11 @@ export default async function OrdersPage() {
             <p className="text-[#5f6980] font-medium">Your account is pending approval.</p>
             <p className="text-sm text-[#5f6980] mt-1">Contact Toys2000 to get your account linked and start placing orders.</p>
           </div>
+        ) : !profile.approved && !profile.is_admin ? (
+          <div className="bg-white rounded-2xl border border-black/[0.06] p-8 text-center">
+            <p className="text-[#5f6980] font-medium">Your account is awaiting approval.</p>
+            <p className="text-sm text-[#5f6980] mt-1">You&apos;ll be able to view orders once Toys2000 approves your retailer account.</p>
+          </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700 text-sm">
             Failed to load orders: {error}
@@ -69,11 +78,7 @@ export default async function OrdersPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
-            {orders.map((order) => (
-              <OrderCard key={order.recordID ?? order.id} order={order} />
-            ))}
-          </div>
+          <OrdersList initialOrders={orders} />
         )}
       </div>
     </div>

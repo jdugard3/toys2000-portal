@@ -1,27 +1,17 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
-import { CATALOG_PRODUCT_SELECT } from '@/lib/catalog';
+import { applyHomeCategoryFilter } from '@/lib/home-categories';
+import { CATALOG_PRODUCT_SELECT, CATALOG_COUNT_TYPE } from '@/lib/catalog';
+import { getBrowseAccess, getCatalogDb, stripProductsPrices } from '@/lib/browse-access';
 
 /**
  * GET /api/catalog
- * Returns paginated products from the Supabase products table.
- * This route exists for client-side fetches (search, filter, pagination)
- * triggered by user interaction. Server Components query Supabase directly.
- *
- * Query params:
- *   manufacturer_id — filter by brand
- *   category        — filter by rep_group_category_path (partial match)
- *   search          — full-text search on name/description
- *   page            — 1-indexed page number (default: 1)
- *   limit           — results per page (default: 48, max: 100)
+ * Returns paginated products. Guests may browse; prices omitted unless approved.
  */
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { showPrices } = await getBrowseAccess(supabase);
+  const db = getCatalogDb(supabase, showPrices);
 
   const { searchParams } = new URL(request.url);
   const manufacturerID = searchParams.get('manufacturer_id');
@@ -31,9 +21,9 @@ export async function GET(request) {
   const limit = Math.min(100, parseInt(searchParams.get('limit') || '48', 10));
   const offset = (page - 1) * limit;
 
-  let query = supabase
+  let query = db
     .from('products')
-    .select(CATALOG_PRODUCT_SELECT, { count: 'exact' })
+    .select(CATALOG_PRODUCT_SELECT, { count: CATALOG_COUNT_TYPE })
     .eq('show_on_website', true)
     .eq('discontinued', false)
     .range(offset, offset + limit - 1)
@@ -41,10 +31,8 @@ export async function GET(request) {
 
   if (manufacturerID) {
     query = query.eq('manufacturer_id', manufacturerID);
-  }
-
-  if (category) {
-    query = query.ilike('rep_group_category_path', `%${category}%`);
+  } else if (category) {
+    ({ query } = await applyHomeCategoryFilter(db, query, category));
   }
 
   if (search) {
@@ -59,11 +47,14 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Failed to fetch catalog' }, { status: 500 });
   }
 
+  const products = showPrices ? data : stripProductsPrices(data);
+
   return NextResponse.json({
-    products: data,
+    products,
     total: count,
     page,
     limit,
     totalPages: Math.ceil(count / limit),
+    showPrices,
   });
 }

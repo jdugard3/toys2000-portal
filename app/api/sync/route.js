@@ -22,11 +22,12 @@ async function withRetry(label, fn, attempts = 3) {
 
 function isAuthorized(request) {
   const authHeader = request.headers.get('authorization');
-  // Vercel cron uses CRON_SECRET; admin trigger uses SUPABASE_SERVICE_ROLE_KEY
-  return (
-    authHeader === `Bearer ${process.env.CRON_SECRET}` ||
-    authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-  );
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[Sync] CRON_SECRET is not configured');
+    return false;
+  }
+  return authHeader === `Bearer ${cronSecret}`;
 }
 
 /**
@@ -48,7 +49,7 @@ export async function GET(request) {
 
 /**
  * POST /api/sync
- * Admin-triggered sync — requires Authorization: Bearer {SUPABASE_SERVICE_ROLE_KEY}
+ * Admin-triggered sync — requires Authorization: Bearer {CRON_SECRET}
  *
  * Query params:
  *   modifiedStartDate (optional) — ISO date string for delta sync e.g. "2026-04-22"

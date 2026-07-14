@@ -1,14 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-// Let route handlers enforce API auth themselves so service-to-service calls
-// (catalog sync, admin mutations, MarketTime proxies) return JSON instead of
-// being redirected to /login by the page auth guard.
-const PUBLIC_PATHS = ['/', '/login', '/api'];
+// Pages reachable without signing in.
+const PUBLIC_PATHS = ['/', '/login', '/catalog', '/product', '/api'];
 
-// Pages an authenticated-but-unapproved user is allowed to view.
-// Everything else requires `profiles.approved = true`.
-const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/api'];
+// Pages an authenticated-but-unapproved user may view (includes public catalog browsing).
+const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/reset-password', '/catalog', '/product', '/api'];
 
 export async function proxy(req) {
   const res = NextResponse.next({

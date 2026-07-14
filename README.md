@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Toys2000 Wholesale Portal
 
-## Getting Started
+Next.js B2B wholesale portal backed by Supabase (catalog/cart) and MarketTime (orders, customers, shipping).
 
-First, run the development server:
+## Prerequisites
+
+- Node.js 20+
+- Supabase project with schema from `supabase/schema.sql`
+- MarketTime API credentials (rep group + salesperson)
+
+## Local setup
 
 ```bash
+cp .env.example .env
+cp .env.example .env.local   # Next.js dev reads .env.local first — keep MT_* keys in sync
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+**Important:** If checkout or shipping calls return 401, verify `MT_API_KEY` matches in both `.env` and `.env.local`, then restart the dev server.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+| Variable | Purpose |
+|----------|---------|
+| `MT_API_KEY` | MarketTime API key (server-only) |
+| `MT_REP_GROUP_ID` | Rep group ID for orders and catalog |
+| `MT_SALESPERSON_ID` | Salesperson ID attached to orders |
+| `MT_B2B_SIGNUP_URL` | External signup link for new retailers |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role for sync and admin writes |
+| `CRON_SECRET` | Bearer token for `/api/sync` |
 
-To learn more about Next.js, take a look at the following resources:
+## Catalog sync
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Products and manufacturers are cached in Supabase. The live catalog is never fetched from MarketTime on page load.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Full catalog pull (~85k products, ~10–15 min)
+npm run sync:mt
 
-## Deploy on Vercel
+# Delta sync (items modified since a date)
+node --env-file=.env scripts/sync-markettime.js --modifiedStartDate=2026-06-01
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Scheduled sync:** Vercel cron hits `GET /api/sync` daily at 4:00 UTC with `Authorization: Bearer $CRON_SECRET`. Admins can also trigger sync from `/admin` (calls `/api/sync/trigger`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Customer sync** (links Supabase profiles to MT retailer IDs):
+
+```bash
+npm run sync:customers
+```
+
+Run after approving new retailers in MarketTime. Not yet on cron — run manually or add a scheduled job when ready.
+
+## User access model
+
+| Role | Catalog | Prices | Cart | Orders |
+|------|---------|--------|------|--------|
+| Guest | Browse | Hidden | No | No |
+| Signed up, unapproved | Browse | Hidden | No | No |
+| Approved retailer | Full | Yes | Yes | Yes |
+| Admin | Full | Yes | Yes | Yes + `/admin` |
+
+Approval is set manually on the `profiles` row (`approved = true`, `retailer_id` set).
+
+## Security notes
+
+- Server routes use `getUser()` — never trust client-submitted prices. Order line items are re-priced from the `products` table at submission.
+- Ship-to addresses must belong to the authenticated retailer (no fallback to first address).
+- Order tracking (`/api/markettime/orders/[id]/tracking`) verifies order ownership before returning data.
+- Sync endpoints require `CRON_SECRET` only (not the service role key).
+- Checkout sends an `Idempotency-Key` header to prevent duplicate orders on double-submit. Requires the `order_idempotency` table in Supabase (included in `schema.sql`).
+
+## Vendor minimums
+
+Per-vendor minimum order amounts are configured in `lib/vendor-minimums.js` until MarketTime exposes them via API. Update the `VENDOR_MINIMUMS` map as needed.
+
+## Database migrations
+
+After pulling schema changes, run new SQL in the Supabase SQL editor. Recent additions:
+
+- `order_idempotency` — checkout idempotency keys
+- `products_catalog_idx` — partial index for catalog queries
+
+## Project structure
+
+```
+app/                  # Next.js App Router pages and API routes
+components/           # React UI components
+lib/                  # Shared logic (catalog, cart, MarketTime client)
+scripts/              # CLI sync scripts
+supabase/schema.sql   # Full database schema + RLS policies
+proxy.js              # Auth gate and guest browse rules
+```
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run sync:mt` | Full MarketTime catalog sync |
+| `npm run sync:customers` | Sync customer/retailer links |
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---------|--------------|
+| Checkout 401 on shipping | Stale `MT_API_KEY` in `.env.local` |
+| Empty home categories | MT `rep_group_category_path` is null — home uses manufacturer keyword mapping |
+| Slow catalog load | Ensure `products_catalog_idx` exists; count uses estimated not exact |
+| Sync 401 | Missing or wrong `CRON_SECRET` in env |
+| Order duplicate on double-click | Ensure `order_idempotency` table exists |

@@ -21,22 +21,28 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
   useEffect(() => {
     if (!profile?.retailer_id) { setDataLoading(false); return; }
 
-    Promise.all([
-      fetch(`/api/markettime/customer/${profile.retailer_id}/shiptos`).then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Failed to load ship-to addresses');
-        return data;
-      }),
-      fetch(`/api/markettime/manufacturer/${manufacturerID}/shipping`).then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Failed to load shipping methods');
-        return data;
-      }),
-    ])
-      .then(([shipTosData, shippingData]) => {
-        setShipTos(shipTosData.shipTos ?? []);
-        setShippingMethods(shippingData.shippingMethods ?? []);
-        setDataError(null);
+    const loadShipTos = fetch(`/api/markettime/customer/${profile.retailer_id}/shiptos`).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to load ship-to addresses');
+      return data.shipTos ?? [];
+    });
+
+    const loadShipping = fetch(`/api/markettime/manufacturer/${manufacturerID}/shipping`).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        console.warn('Shipping methods unavailable:', data.error);
+        return [];
+      }
+      return data.shippingMethods ?? [];
+    });
+
+    Promise.all([loadShipTos, loadShipping])
+      .then(([shipToList, methodList]) => {
+        setShipTos(shipToList);
+        setShippingMethods(methodList);
+        if (methodList.length === 0) {
+          setDataError(null);
+        }
       })
       .catch((err) => setDataError(err.message))
       .finally(() => setDataLoading(false));

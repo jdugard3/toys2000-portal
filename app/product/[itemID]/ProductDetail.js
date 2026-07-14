@@ -8,7 +8,7 @@ import { useCart } from '@/components/CartProvider';
 import ProductCard from '@/components/ProductCard';
 import ProductDescription from '@/components/ProductDescription';
 
-export default function ProductDetail({ product, related }) {
+export default function ProductDetail({ product, related, showPrices = true }) {
   const {
     record_id,
     name,
@@ -118,15 +118,25 @@ export default function ProductDetail({ product, related }) {
             </div>
 
             {/* Price */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-[#1a1d26]">{formatCurrency(unit_price)}</span>
-              {retail_price && (
-                <span className="text-sm text-[#5f6980]">MSRP: {formatCurrency(retail_price)}</span>
-              )}
-              {discount_percent > 0 && (
-                <span className="text-sm font-bold text-[#f15a24]">{discount_percent}% off</span>
-              )}
-            </div>
+            {showPrices ? (
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-bold text-[#1a1d26]">{formatCurrency(unit_price)}</span>
+                {retail_price && (
+                  <span className="text-sm text-[#5f6980]">MSRP: {formatCurrency(retail_price)}</span>
+                )}
+                {discount_percent > 0 && (
+                  <span className="text-sm font-bold text-[#f15a24]">{discount_percent}% off</span>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl bg-[#f7f8fa] border border-black/[0.06] px-4 py-3 text-sm text-[#5f6980]">
+                Wholesale pricing is available to approved retailers.{' '}
+                <Link href={`/login?redirect=/product/${record_id}`} className="text-[#00aeef] font-semibold hover:underline">
+                  Sign in
+                </Link>{' '}
+                to view pricing and place orders.
+              </div>
+            )}
 
             {/* Availability */}
             <div className="flex items-center gap-2 text-sm">
@@ -137,7 +147,7 @@ export default function ProductDetail({ product, related }) {
             </div>
 
             {/* Volume pricing */}
-            {volume_pricing?.length > 0 && (
+            {showPrices && volume_pricing?.length > 0 && (
               <div className="bg-[#f7f8fa] rounded-xl p-4">
                 <p className="text-xs font-bold text-[#5f6980] uppercase tracking-wide mb-2">Volume Pricing</p>
                 <div className="space-y-1">
@@ -166,44 +176,55 @@ export default function ProductDetail({ product, related }) {
               </div>
             )}
 
-            {/* Quantity controls */}
-            <div>
-              <p className="text-sm font-medium text-[#1a1d26] mb-2">
-                Quantity
-                <span className="text-[#5f6980] font-normal ml-2 text-xs">
-                  (min {minimum_quantity}{quantity_increment > 1 ? `, increments of ${quantity_increment}` : ''})
-                </span>
-              </p>
-              <div className="flex items-center gap-3">
-                <button onClick={() => handleQtyChange(-1)} className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center text-xl font-medium text-[#1a1d26] hover:bg-[#f7f8fa]">−</button>
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={handleQtyInput}
-                  onBlur={handleQtyBlur}
-                  className="w-20 text-center border border-gray-200 rounded-lg py-2 font-semibold focus:outline-none focus:border-[#f15a24]"
-                  min={minimum_quantity}
-                  step={quantity_increment}
-                />
-                <button onClick={() => handleQtyChange(1)} className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center text-xl font-medium text-[#1a1d26] hover:bg-[#f7f8fa]">+</button>
-                <span className="text-lg font-bold text-[#1a1d26]">{formatCurrency(lineTotal)}</span>
-              </div>
-              {!isValidQuantity(quantity, minimum_quantity, quantity_increment) && quantity > 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Quantity will snap to {snapQuantity(quantity, minimum_quantity, quantity_increment)} when added.
-                </p>
-              )}
-            </div>
+            {showPrices ? (
+              <>
+                {/* Quantity controls */}
+                <div>
+                  <p className="text-sm font-medium text-[#1a1d26] mb-2">
+                    Quantity
+                    <span className="text-[#5f6980] font-normal ml-2 text-xs">
+                      (min {minimum_quantity}{quantity_increment > 1 ? `, increments of ${quantity_increment}` : ''})
+                    </span>
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleQtyChange(-1)} className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center text-xl font-medium text-[#1a1d26] hover:bg-[#f7f8fa]">−</button>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={handleQtyInput}
+                      onBlur={handleQtyBlur}
+                      className="w-20 text-center border border-gray-200 rounded-lg py-2 font-semibold focus:outline-none focus:border-[#f15a24]"
+                      min={minimum_quantity}
+                      step={quantity_increment}
+                    />
+                    <button onClick={() => handleQtyChange(1)} className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center text-xl font-medium text-[#1a1d26] hover:bg-[#f7f8fa]">+</button>
+                    <span className="text-lg font-bold text-[#1a1d26]">{formatCurrency(lineTotal)}</span>
+                  </div>
+                  {!isValidQuantity(quantity, minimum_quantity, quantity_increment) && quantity > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Quantity will snap to {snapQuantity(quantity, minimum_quantity, quantity_increment)} when added.
+                    </p>
+                  )}
+                </div>
 
-            {/* Add to cart */}
-            <button
-              onClick={handleAddToCart}
-              disabled={adding || !is_available}
-              className="w-full py-4 rounded-xl font-bold text-white text-base transition-all disabled:opacity-60"
-              style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive" }}
-            >
-              {adding ? 'Adding…' : is_available ? 'Add to cart' : 'Out of stock'}
-            </button>
+                <button
+                  onClick={handleAddToCart}
+                  disabled={adding || !is_available}
+                  className="w-full py-4 rounded-xl font-bold text-white text-base transition-all disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive" }}
+                >
+                  {adding ? 'Adding…' : is_available ? 'Add to cart' : 'Out of stock'}
+                </button>
+              </>
+            ) : (
+              <Link
+                href={`/login?redirect=/product/${record_id}`}
+                className="w-full py-4 rounded-xl font-bold text-white text-base text-center block no-underline"
+                style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive", color: '#ffffff' }}
+              >
+                Sign in to order
+              </Link>
+            )}
 
             {/* Description */}
             {description && (
@@ -223,7 +244,7 @@ export default function ProductDetail({ product, related }) {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {related.map((p) => (
-                <ProductCard key={p.record_id} product={p} />
+                <ProductCard key={p.record_id} product={p} showPrices={showPrices} />
               ))}
             </div>
           </div>

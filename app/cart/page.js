@@ -117,10 +117,14 @@ export default function CartPage() {
                       </span>
                       <Link
                         href={`/checkout/${group.manufacturerID}`}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all ${
+                        className={`cart-vendor-checkout-btn px-5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${
                           belowMin ? 'opacity-50 pointer-events-none' : ''
                         }`}
-                        style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive" }}
+                        style={{
+                          background: 'linear-gradient(135deg, #f15a24, #ff7a4d)',
+                          color: '#ffffff',
+                          fontFamily: "'Baloo 2', cursive",
+                        }}
                         aria-disabled={belowMin}
                       >
                         Checkout {group.manufacturerName} →

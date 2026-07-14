@@ -2,16 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { snapQuantity, formatCurrency } from '@/lib/cart';
+import { snapQuantity, formatCurrency, getUnitPriceForQuantity } from '@/lib/cart';
 
-const BULK_TIERS = [
-  { label: 'Regular', minQty: 1, discount: 0 },
-  { label: 'Bulk (10+)', minQty: 10, discount: 0.10 },
-  { label: 'Bulk (25+)', minQty: 25, discount: 0.15 },
-  { label: 'Bulk (50+)', minQty: 50, discount: 0.20 },
-];
-
-export default function QuickView({ product, open, onClose, onAddToCart }) {
+export default function QuickView({ product, open, onClose, onAddToCart, showPrices = true }) {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -40,13 +33,12 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
     primary_image_url,
     minimum_quantity = 1,
     quantity_increment = 1,
-    description,
     volume_pricing,
   } = product;
 
-  const activeTier = BULK_TIERS.slice().reverse().find((t) => quantity >= t.minQty) ?? BULK_TIERS[0];
-  const effectivePrice = unit_price * (1 - activeTier.discount);
-  const lineTotal = effectivePrice * quantity;
+  const unitPrice = showPrices ? getUnitPriceForQuantity(product, quantity) : null;
+  const lineTotal = unitPrice != null ? unitPrice * quantity : null;
+  const tiers = Array.isArray(volume_pricing) ? volume_pricing : [];
 
   const handleQty = (delta) => {
     setQuantity((prev) => {
@@ -72,10 +64,9 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
       <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto relative"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/80 text-[#5f6980] hover:bg-[#f7f8fa] transition-colors"
@@ -86,7 +77,6 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
           </button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
-            {/* Image */}
             <div className="relative aspect-square bg-[#f7f8fa] rounded-t-2xl sm:rounded-l-2xl sm:rounded-tr-none overflow-hidden">
               {primary_image_url ? (
                 <Image
@@ -101,7 +91,6 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
               )}
             </div>
 
-            {/* Details */}
             <div className="p-6 flex flex-col gap-4">
               <div>
                 <p className="text-xs text-[#5f6980] font-medium">{manufacturer_name}</p>
@@ -110,32 +99,26 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
                 </h2>
               </div>
 
-              {/* Pricing tiers */}
-              <div>
-                <p className="text-xs font-semibold text-[#5f6980] uppercase tracking-wide mb-2">Pricing</p>
-                <div className="space-y-1">
-                  {BULK_TIERS.map((tier) => {
-                    const tierPrice = unit_price * (1 - tier.discount);
-                    const isActive = tier === activeTier;
-                    return (
-                      <div
-                        key={tier.label}
-                        className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-sm transition-all ${
-                          isActive
-                            ? 'font-semibold text-[#1a1d26]'
-                            : 'text-[#5f6980]'
-                        }`}
-                        style={isActive ? { background: 'rgba(241, 90, 36, 0.08)', color: '#f15a24' } : {}}
-                      >
-                        <span>{tier.label}</span>
-                        <span>{formatCurrency(tierPrice)}{tier.discount > 0 && <span className="text-xs ml-1">({tier.discount * 100}% off)</span>}</span>
-                      </div>
-                    );
-                  })}
+              {showPrices ? (
+                <div>
+                  <p className="text-xs font-semibold text-[#5f6980] uppercase tracking-wide mb-2">Pricing</p>
+                  {tiers.length > 0 ? (
+                    <div className="space-y-1">
+                      {tiers.map((tier, i) => (
+                        <div key={i} className="flex justify-between text-sm text-[#5f6980]">
+                          <span>{tier.volumeQuantity}+ units</span>
+                          <span className="font-semibold text-[#1a1d26]">{formatCurrency(tier.unitPrice)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-[#1a1d26]">{formatCurrency(unit_price)}</p>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <p className="text-sm text-[#5f6980]">Sign in to see wholesale pricing.</p>
+              )}
 
-              {/* Quantity */}
               <div>
                 <p className="text-xs font-semibold text-[#5f6980] uppercase tracking-wide mb-2">
                   Quantity {minimum_quantity > 1 && <span className="normal-case">(min {minimum_quantity}, increments of {quantity_increment})</span>}
@@ -155,20 +138,22 @@ export default function QuickView({ product, open, onClose, onAddToCart }) {
                 </div>
               </div>
 
-              {/* Line total */}
-              <div className="flex justify-between items-baseline font-bold text-[#1a1d26]">
-                <span style={{ fontFamily: "'Baloo 2', cursive" }}>Total</span>
-                <span className="text-2xl">{formatCurrency(lineTotal)}</span>
-              </div>
+              {showPrices && lineTotal != null && (
+                <div className="flex justify-between items-baseline font-bold text-[#1a1d26]">
+                  <span style={{ fontFamily: "'Baloo 2', cursive" }}>Total</span>
+                  <span className="text-2xl">{formatCurrency(lineTotal)}</span>
+                </div>
+              )}
 
-              {/* Add to cart */}
-              <button
-                onClick={handleAdd}
-                className="w-full py-3 rounded-xl font-semibold text-white transition-all"
-                style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive" }}
-              >
-                Add to cart
-              </button>
+              {showPrices && (
+                <button
+                  onClick={handleAdd}
+                  className="w-full py-3 rounded-xl font-semibold text-white transition-all"
+                  style={{ background: 'linear-gradient(135deg, #f15a24, #ff7a4d)', fontFamily: "'Baloo 2', cursive" }}
+                >
+                  Add to cart
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/cart';
 
-export default function ProductCard({ product, onQuickView }) {
+export default function ProductCard({ product, onQuickView, showPrices = true }) {
   const {
     record_id,
     name,
@@ -74,9 +74,10 @@ export default function ProductCard({ product, onQuickView }) {
         )}
 
         {/* Quick view on hover */}
+        {onQuickView && (
         <button
           className="product-quickview-btn"
-          onClick={(e) => { e.preventDefault(); onQuickView?.(product); }}
+          onClick={(e) => { e.preventDefault(); onQuickView(product); }}
         >
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -84,6 +85,7 @@ export default function ProductCard({ product, onQuickView }) {
           </svg>
           Quick view
         </button>
+        )}
       </div>
 
       {/* Text info */}
@@ -93,9 +95,15 @@ export default function ProductCard({ product, onQuickView }) {
           <h3 className="product-title">{name}</h3>
         </Link>
         <div className="product-price-row">
-          <span className="product-price">{formatCurrency(unit_price)}</span>
-          {minimum_quantity > 1 && (
-            <span className="product-bulk-price">min {minimum_quantity}</span>
+          {showPrices ? (
+            <>
+              <span className="product-price">{formatCurrency(unit_price)}</span>
+              {minimum_quantity > 1 && (
+                <span className="product-bulk-price">min {minimum_quantity}</span>
+              )}
+            </>
+          ) : (
+            <span className="product-bulk-price">Sign in to see pricing</span>
           )}
         </div>
         <div className="product-actions">

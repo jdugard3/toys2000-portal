@@ -85,6 +85,9 @@ create table if not exists products (
 create index if not exists products_manufacturer_id_idx on products(manufacturer_id);
 create index if not exists products_show_on_website_idx on products(show_on_website);
 create index if not exists products_discontinued_idx on products(discontinued);
+create index if not exists products_catalog_idx
+  on products(show_on_website, discontinued, record_id)
+  where show_on_website = true and discontinued = false;
 -- Full-text search on name and description
 create index if not exists products_search_idx
   on products using gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(description, '')));
@@ -129,6 +132,23 @@ drop trigger if exists cart_items_updated_at on cart_items;
 create trigger cart_items_updated_at
   before update on cart_items
   for each row execute procedure update_updated_at();
+
+
+-- ─── order_idempotency ───────────────────────────────────────
+-- Prevents duplicate MarketTime orders when checkout is double-submitted.
+-- Written by the service role in POST /api/markettime/orders only.
+
+create table if not exists order_idempotency (
+  key             text primary key,
+  user_id         uuid not null references auth.users on delete cascade,
+  order_response  jsonb not null,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists order_idempotency_user_created_idx
+  on order_idempotency(user_id, created_at desc);
+
+alter table order_idempotency enable row level security;
 
 
 -- ─── sync_log ─────────────────────────────────────────────────
