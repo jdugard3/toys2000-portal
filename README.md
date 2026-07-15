@@ -46,15 +46,15 @@ npm run sync:mt
 node --env-file=.env scripts/sync-markettime.js --modifiedStartDate=2026-06-01
 ```
 
-**Scheduled sync:** Vercel cron hits `GET /api/sync` daily at 4:00 UTC with `Authorization: Bearer $CRON_SECRET`. Admins can also trigger sync from `/admin` (calls `/api/sync/trigger`).
+**Scheduled sync:** Vercel cron hits `GET /api/sync` daily at 4:00 UTC (catalog) and `GET /api/sync/customers` at 4:30 UTC (customer linking). Admins can also trigger either sync from `/admin`.
 
-**Customer sync** (links Supabase profiles to MT retailer IDs):
+**Customer sync** (links Supabase profiles to MT retailer IDs by email):
 
 ```bash
 npm run sync:customers
 ```
 
-Run after approving new retailers in MarketTime. Not yet on cron — run manually or add a scheduled job when ready.
+Runs automatically via cron when deployed. Also available from the admin dashboard.
 
 ## User access model
 

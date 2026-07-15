@@ -8,6 +8,8 @@ export default function AdminClient({ profiles: initialProfiles, syncLog }) {
   const [editing, setEditing] = useState({}); // { [userId]: retailer_id value }
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [customerSyncing, setCustomerSyncing] = useState(false);
+  const [customerSyncResult, setCustomerSyncResult] = useState(null);
 
   const handleRetailerIdChange = (userId, value) => {
     setEditing((prev) => ({ ...prev, [userId]: value }));
@@ -70,6 +72,25 @@ export default function AdminClient({ profiles: initialProfiles, syncLog }) {
     }
   };
 
+  const handleCustomerSync = async () => {
+    setCustomerSyncing(true);
+    setCustomerSyncResult(null);
+    try {
+      const res = await fetch('/api/sync/customers/trigger', { method: 'POST' });
+      const data = await res.json();
+      setCustomerSyncResult(data);
+      if (data.success) {
+        toast.success(`Customer sync: ${data.linkedProfiles} profiles linked`);
+      } else {
+        toast.error(`Customer sync failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCustomerSyncing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -128,6 +149,31 @@ export default function AdminClient({ profiles: initialProfiles, syncLog }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Customer sync */}
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-6 mb-8">
+          <h2 className="font-bold text-[#1a1d26] mb-2" style={{ fontFamily: "'Baloo 2', cursive" }}>
+            Customer Sync
+          </h2>
+          <p className="text-sm text-[#5f6980] mb-4">
+            Matches portal sign-ups to MarketTime customers by email. Sets retailer ID and approval status automatically.
+          </p>
+          <button
+            onClick={handleCustomerSync}
+            disabled={customerSyncing}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition-all"
+            style={{ background: 'linear-gradient(135deg, #8cc63f, #a8d96a)' }}
+          >
+            {customerSyncing ? 'Syncing…' : 'Sync customers now'}
+          </button>
+
+          {customerSyncResult?.success && (
+            <div className="text-sm px-4 py-3 rounded-lg bg-green-50 text-green-800 mt-4">
+              Linked {customerSyncResult.linkedProfiles} of {customerSyncResult.supabaseUsers} users
+              ({customerSyncResult.matchedByEmail} matched by email, {customerSyncResult.unmatchedUsers} unmatched)
             </div>
           )}
         </div>

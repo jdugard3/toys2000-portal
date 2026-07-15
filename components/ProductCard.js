@@ -38,7 +38,7 @@ export default function ProductCard({ product, onQuickView, showPrices = true })
     <div ref={cardRef} className={`product-card${inView ? ' in-view' : ''}`}>
       {/* Image area */}
       <div className="product-image-container">
-        <Link href={`/product/${record_id}`} style={{ display: 'block', height: '100%' }}>
+        <Link href={`/product/${record_id}`} className="relative block h-full">
           {primary_image_url ? (
             <Image
               src={primary_image_url}
