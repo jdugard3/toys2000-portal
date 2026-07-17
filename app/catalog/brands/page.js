@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getBrowseAccess, getCatalogDb } from '@/lib/browse-access';
+import { getActiveManufacturers } from '@/lib/active-manufacturers';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -11,10 +12,7 @@ export default async function BrandsPage() {
   const { showPrices } = await getBrowseAccess(supabase);
   const db = getCatalogDb(supabase, showPrices);
 
-  const { data: manufacturers } = await db
-    .from('manufacturers')
-    .select('manufacturer_id, name, logo_url')
-    .order('name');
+  const manufacturers = await getActiveManufacturers(db);
 
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
@@ -30,12 +28,12 @@ export default async function BrandsPage() {
             Our Brands
           </h1>
           <p className="text-sm text-[#5f6980] mt-1">
-            {(manufacturers ?? []).length} brands represented by Toys2000
+            {manufacturers.length} brands represented by Toys2000
           </p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {(manufacturers ?? []).map((mfr) => (
+          {manufacturers.map((mfr) => (
             <Link
               key={mfr.manufacturer_id}
               href={`/catalog/${mfr.manufacturer_id}`}

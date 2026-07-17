@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/components/CartProvider';
@@ -10,6 +10,16 @@ import { getVendorMinimum, meetsVendorMinimum } from '@/lib/vendor-minimums';
 
 export default function CartPage() {
   const { cartItems, updateQuantity, removeFromCart, clearCart, loading } = useCart();
+  const [activeManufacturerIds, setActiveManufacturerIds] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/manufacturers')
+      .then((res) => res.json())
+      .then((data) => {
+        setActiveManufacturerIds(new Set((data.manufacturers ?? []).map((m) => m.manufacturer_id)));
+      })
+      .catch(() => setActiveManufacturerIds(new Set()));
+  }, []);
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
   const grandTotal = cartItems.reduce((s, i) => s + i.unit_price * i.quantity, 0);
@@ -69,6 +79,10 @@ export default function CartPage() {
               const subtotal = vendorSubtotal(group.items);
               const minimum = getVendorMinimum(group.manufacturerID);
               const belowMin = minimum > 0 && subtotal < minimum;
+              const isActiveVendor = activeManufacturerIds
+                ? activeManufacturerIds.has(group.manufacturerID)
+                : true;
+              const checkoutDisabled = belowMin || !isActiveVendor;
 
               return (
                 <div key={group.manufacturerID} className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden">
@@ -105,6 +119,12 @@ export default function CartPage() {
                       </div>
                     )}
 
+                    {!isActiveVendor && (
+                      <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs font-medium text-red-800">
+                        {group.manufacturerName} is not available through Toys2000. Remove these items or shop an active brand.
+                      </div>
+                    )}
+
                     <FreightNudge
                       promotions={[]}
                       subtotal={subtotal}
@@ -118,14 +138,14 @@ export default function CartPage() {
                       <Link
                         href={`/checkout/${group.manufacturerID}`}
                         className={`cart-vendor-checkout-btn px-5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${
-                          belowMin ? 'opacity-50 pointer-events-none' : ''
+                          checkoutDisabled ? 'opacity-50 pointer-events-none' : ''
                         }`}
                         style={{
                           background: 'linear-gradient(135deg, #f15a24, #ff7a4d)',
                           color: '#ffffff',
                           fontFamily: "'Baloo 2', cursive",
                         }}
-                        aria-disabled={belowMin}
+                        aria-disabled={checkoutDisabled}
                       >
                         Checkout {group.manufacturerName} →
                       </Link>

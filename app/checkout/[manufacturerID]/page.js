@@ -1,8 +1,10 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
-import { redirect, notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import CheckoutClient from './CheckoutClient';
+import InactiveVendorCheckout from './InactiveVendorCheckout';
+import { getActiveManufacturers, isActiveManufacturerId } from '@/lib/active-manufacturers';
 
 export const metadata = { title: 'Checkout — Toys2000 Wholesale' };
 
@@ -19,14 +21,26 @@ export default async function CheckoutPage({ params }) {
     .eq('id', user.id)
     .single();
 
-  // Fetch manufacturer from Supabase cache
-  const { data: manufacturer } = await supabase
+  const admin = createAdminClient();
+  const { data: manufacturer } = await admin
     .from('manufacturers')
     .select('manufacturer_id, name, logo_url')
     .eq('manufacturer_id', manufacturerID)
     .single();
 
-  if (!manufacturer) notFound();
+  const activeManufacturers = await getActiveManufacturers(admin);
+
+  if (!isActiveManufacturerId(manufacturerID, activeManufacturers)) {
+    return (
+      <InactiveVendorCheckout
+        manufacturerName={manufacturer?.name ?? 'This vendor'}
+      />
+    );
+  }
+
+  if (!manufacturer) {
+    return <InactiveVendorCheckout manufacturerName="This vendor" />;
+  }
 
   return (
     <CheckoutClient

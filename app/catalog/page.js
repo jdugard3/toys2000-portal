@@ -2,6 +2,12 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { CATALOG_PRODUCT_SELECT, CATALOG_COUNT_TYPE } from '@/lib/catalog';
 import { getBrowseAccess, getCatalogDb, stripProductsPrices } from '@/lib/browse-access';
 import { applyHomeCategoryFilter, getHomeCategory } from '@/lib/home-categories';
+import {
+  applyActiveProductFilter,
+  findActiveManufacturerByBrandParam,
+  getActiveManufacturers,
+  isActiveManufacturerId,
+} from '@/lib/active-manufacturers';
 
 export const dynamic = 'force-dynamic';
 import CatalogGrid from './CatalogGrid';
@@ -19,13 +25,16 @@ export default async function CatalogPage({ searchParams }) {
   const search = params.search || null;
   const homeCategory = getHomeCategory(category);
 
+  const manufacturers = await getActiveManufacturers(db);
+  const activeIds = manufacturers.map((m) => m.manufacturer_id);
+
   if (!manufacturerID && params.brand) {
-    const { data: mfr } = await db
-      .from('manufacturers')
-      .select('manufacturer_id')
-      .ilike('name', params.brand)
-      .maybeSingle();
+    const mfr = findActiveManufacturerByBrandParam(manufacturers, params.brand);
     manufacturerID = mfr?.manufacturer_id ?? null;
+  }
+
+  if (manufacturerID && !isActiveManufacturerId(manufacturerID, manufacturers)) {
+    manufacturerID = null;
   }
 
   let query = db
@@ -35,6 +44,8 @@ export default async function CatalogPage({ searchParams }) {
     .eq('discontinued', false)
     .order('record_id')
     .range(0, 47);
+
+  query = applyActiveProductFilter(query, activeIds);
 
   if (manufacturerID) {
     query = query.eq('manufacturer_id', manufacturerID);
@@ -47,16 +58,12 @@ export default async function CatalogPage({ searchParams }) {
     query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
   }
 
-  const [productsResult, manufacturersResult] = await Promise.all([
-    query,
-    db.from('manufacturers').select('manufacturer_id, name').order('name'),
-  ]);
+  const productsResult = await query;
 
   const products = showPrices
     ? (productsResult.data ?? [])
     : stripProductsPrices(productsResult.data);
   const total = productsResult.count ?? 0;
-  const manufacturers = manufacturersResult.data ?? [];
 
   const pageTitle = manufacturerID
     ? manufacturers.find((m) => m.manufacturer_id === manufacturerID)?.name ?? 'Brand Catalog'

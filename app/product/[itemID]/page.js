@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { CATALOG_PRODUCT_SELECT, CATALOG_PRODUCT_DETAIL_SELECT } from '@/lib/catalog';
 import { getBrowseAccess, getCatalogDb, stripProductPrices, stripProductsPrices } from '@/lib/browse-access';
+import { getActiveManufacturers, isActiveManufacturerId } from '@/lib/active-manufacturers';
 
 export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
@@ -24,6 +25,7 @@ export default async function ProductPage({ params }) {
   const supabase = await createServerSupabaseClient();
   const { showPrices } = await getBrowseAccess(supabase);
   const db = getCatalogDb(supabase, showPrices);
+  const activeManufacturers = await getActiveManufacturers(db);
 
   const { data: product, error } = await db
     .from('products')
@@ -33,7 +35,9 @@ export default async function ProductPage({ params }) {
     .eq('discontinued', false)
     .single();
 
-  if (error || !product) notFound();
+  if (error || !product || !isActiveManufacturerId(product.manufacturer_id, activeManufacturers)) {
+    notFound();
+  }
 
   const { data: relatedRaw } = await db
     .from('products')

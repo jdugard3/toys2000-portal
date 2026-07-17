@@ -193,9 +193,9 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <p className="font-semibold">Could not load checkout data</p>
           <p className="mt-1">{dataError}</p>
-          {dataError.includes('401') && (
+          {dataError.includes('API key') && (
             <p className="mt-2 text-xs text-red-600">
-              Your MarketTime API key may be invalid. Ensure <code>MT_API_KEY</code> in <code>.env.local</code> matches <code>.env</code>, then restart the dev server.
+              Run <code>npm run verify:mt</code> after updating your key. Restart the dev server when done.
             </p>
           )}
         </div>

@@ -2,6 +2,7 @@ import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-se
 import { createOrder, getCustomer, getCustomerShipTos } from '@/lib/markettime';
 import { buildMarketTimeOrder, getShipToRecordId } from '@/lib/build-markettime-order';
 import { validateAndNormalizeOrderDetails } from '@/lib/validate-order';
+import { getActiveManufacturers, isActiveManufacturerId } from '@/lib/active-manufacturers';
 import { NextResponse } from 'next/server';
 
 /**
@@ -43,6 +44,11 @@ export async function POST(request) {
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim();
   const db = createAdminClient();
+
+  const activeManufacturers = await getActiveManufacturers(db);
+  if (!isActiveManufacturerId(body.manufacturerID, activeManufacturers)) {
+    return NextResponse.json({ error: 'This manufacturer is not available for ordering.' }, { status: 400 });
+  }
 
   if (idempotencyKey) {
     const storageKey = `${user.id}:${idempotencyKey}`;

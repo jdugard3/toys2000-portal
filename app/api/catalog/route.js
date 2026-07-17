@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server';
 import { applyHomeCategoryFilter } from '@/lib/home-categories';
 import { CATALOG_PRODUCT_SELECT, CATALOG_COUNT_TYPE } from '@/lib/catalog';
 import { getBrowseAccess, getCatalogDb, stripProductsPrices } from '@/lib/browse-access';
+import {
+  applyActiveProductFilter,
+  getActiveManufacturers,
+  isActiveManufacturerId,
+} from '@/lib/active-manufacturers';
 
 /**
  * GET /api/catalog
@@ -21,6 +26,13 @@ export async function GET(request) {
   const limit = Math.min(100, parseInt(searchParams.get('limit') || '48', 10));
   const offset = (page - 1) * limit;
 
+  const activeManufacturers = await getActiveManufacturers(db);
+  const activeIds = activeManufacturers.map((m) => m.manufacturer_id);
+
+  if (manufacturerID && !isActiveManufacturerId(manufacturerID, activeManufacturers)) {
+    return NextResponse.json({ products: [], total: 0, page, limit, totalPages: 0, showPrices });
+  }
+
   let query = db
     .from('products')
     .select(CATALOG_PRODUCT_SELECT, { count: CATALOG_COUNT_TYPE })
@@ -28,6 +40,8 @@ export async function GET(request) {
     .eq('discontinued', false)
     .range(offset, offset + limit - 1)
     .order('record_id');
+
+  query = applyActiveProductFilter(query, activeIds);
 
   if (manufacturerID) {
     query = query.eq('manufacturer_id', manufacturerID);

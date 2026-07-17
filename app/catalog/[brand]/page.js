@@ -1,6 +1,11 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { CATALOG_PRODUCT_SELECT, CATALOG_COUNT_TYPE } from '@/lib/catalog';
 import { getBrowseAccess, getCatalogDb, stripProductsPrices } from '@/lib/browse-access';
+import {
+  applyActiveProductFilter,
+  getActiveManufacturers,
+  isActiveManufacturerId,
+} from '@/lib/active-manufacturers';
 
 export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
@@ -20,18 +25,25 @@ export default async function BrandCatalogPage({ params }) {
   const db = getCatalogDb(supabase, showPrices);
 
   const manufacturerID = decodeURIComponent(brand);
+  const manufacturers = await getActiveManufacturers(db);
 
-  const [mfrResult, productsResult, allMfrsResult] = await Promise.all([
+  if (!isActiveManufacturerId(manufacturerID, manufacturers)) {
+    notFound();
+  }
+
+  const [mfrResult, productsResult] = await Promise.all([
     db.from('manufacturers').select('*').eq('manufacturer_id', manufacturerID).single(),
-    db
-      .from('products')
-      .select(CATALOG_PRODUCT_SELECT, { count: CATALOG_COUNT_TYPE })
-      .eq('manufacturer_id', manufacturerID)
-      .eq('show_on_website', true)
-      .eq('discontinued', false)
-      .order('record_id')
-      .range(0, 47),
-    db.from('manufacturers').select('manufacturer_id, name').order('name'),
+    applyActiveProductFilter(
+      db
+        .from('products')
+        .select(CATALOG_PRODUCT_SELECT, { count: CATALOG_COUNT_TYPE })
+        .eq('manufacturer_id', manufacturerID)
+        .eq('show_on_website', true)
+        .eq('discontinued', false)
+        .order('record_id')
+        .range(0, 47),
+      [manufacturerID]
+    ),
   ]);
 
   if (mfrResult.error || !mfrResult.data) notFound();
@@ -41,7 +53,6 @@ export default async function BrandCatalogPage({ params }) {
     ? (productsResult.data ?? [])
     : stripProductsPrices(productsResult.data);
   const total = productsResult.count ?? 0;
-  const manufacturers = allMfrsResult.data ?? [];
 
   return (
     <div className="min-h-screen bg-[#f7f8fa]">

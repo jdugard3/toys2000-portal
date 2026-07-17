@@ -2,21 +2,16 @@ import Link from 'next/link';
 import Image from 'next/image';
 import HeroCarousel from '@/components/HeroCarousel';
 import { HOME_CATEGORIES } from '@/lib/home-categories';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getBrowseAccess, getCatalogDb } from '@/lib/browse-access';
+import { getActiveManufacturers, resolveBrandLogo } from '@/lib/active-manufacturers';
 
-const BRANDS = [
-  { name: 'Airhead', logo: '/logos/Airhead-Primary-Logo-website.png' },
-  { name: 'Aqua Leisure', logo: '/logos/aqua_leisure.png' },
-  { name: 'Boss Play', logo: '/logos/boss_play.png' },
-  { name: 'Lionel', logo: '/logos/lionel.png' },
-  { name: 'Masterpieces', logo: '/logos/masterpieces-logo.png' },
-  { name: 'Ovvel', logo: '/logos/ovvel.png' },
-  { name: 'Rico Italia', logo: '/logos/rico_italia.png' },
-  { name: 'Trophy Music', logo: '/logos/trophy_music_co.png' },
-  { name: 'Water Sports', logo: '/logos/water_sports.png' },
-  { name: '3D Toy Store', logo: '/logos/3d_toy_store.png' },
-];
+export default async function HomePage() {
+  const supabase = await createServerSupabaseClient();
+  const { showPrices } = await getBrowseAccess(supabase);
+  const db = getCatalogDb(supabase, showPrices);
+  const brands = await getActiveManufacturers(db);
 
-export default function HomePage() {
   return (
     <div className="min-h-screen">
       <HeroCarousel />
@@ -93,21 +88,28 @@ export default function HomePage() {
           </h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {BRANDS.map((brand) => (
-            <Link
-              key={brand.name}
-              href={`/catalog?brand=${encodeURIComponent(brand.name)}`}
-              className="bg-white rounded-2xl border border-black/[0.06] p-4 flex items-center justify-center h-24 hover:shadow-md transition-all group"
-            >
-              <Image
-                src={brand.logo}
-                alt={brand.name}
-                width={120}
-                height={60}
-                className="object-contain max-h-12 w-auto group-hover:scale-105 transition-transform"
-              />
-            </Link>
-          ))}
+          {brands.map((brand) => {
+            const logo = brand.logo_url || resolveBrandLogo(brand.name);
+            return (
+              <Link
+                key={brand.manufacturer_id}
+                href={`/catalog/${brand.manufacturer_id}`}
+                className="bg-white rounded-2xl border border-black/[0.06] p-4 flex items-center justify-center h-24 hover:shadow-md transition-all group"
+              >
+                {logo ? (
+                  <Image
+                    src={logo}
+                    alt={brand.name}
+                    width={120}
+                    height={60}
+                    className="object-contain max-h-12 w-auto group-hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-[#1a1d26] text-center px-2">{brand.name}</span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </section>
 

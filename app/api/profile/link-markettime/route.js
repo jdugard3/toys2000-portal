@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server';
+import { getMarketTimeConfig } from '@/lib/markettime-config';
 import { NextResponse } from 'next/server';
 
 const BASE_URL = 'https://publicapi.markettime.com/mtpublic/api/v1';
@@ -14,12 +15,13 @@ function isApprovedCustomer(customer) {
 }
 
 async function fetchCustomersPage(offset) {
+  const { repGroupId, apiKey } = getMarketTimeConfig();
   const res = await fetch(
-    `${BASE_URL}/${process.env.MT_REP_GROUP_ID}/customers/get?offset=${offset}&recordSize=${PAGE_SIZE}`,
+    `${BASE_URL}/${repGroupId}/customers/get?offset=${offset}&recordSize=${PAGE_SIZE}`,
     {
       method: 'POST',
       headers: {
-        'x-api-key': process.env.MT_API_KEY,
+        'x-api-key': apiKey,
         'Content-Type': 'application/json',
       },
       // MarketTime expects an array of QueryFilter objects. Empty array returns

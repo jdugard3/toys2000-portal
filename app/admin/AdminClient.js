@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import CustomerUploadPanel from '@/components/CustomerUploadPanel';
 
 export default function AdminClient({ profiles: initialProfiles, syncLog }) {
   const [profiles, setProfiles] = useState(initialProfiles);
@@ -177,6 +178,8 @@ export default function AdminClient({ profiles: initialProfiles, syncLog }) {
             </div>
           )}
         </div>
+
+        <CustomerUploadPanel />
 
         {/* User management */}
         <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden">

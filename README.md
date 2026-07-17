@@ -19,7 +19,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-**Important:** If checkout or shipping calls return 401, verify `MT_API_KEY` matches in both `.env` and `.env.local`, then restart the dev server.
+**Important:** If checkout or live MarketTime calls return 401, your `MT_API_KEY` is invalid or expired — not a code bug. Regenerate it in MarketTime (Billing & Payment → API Key), update `.env` and `.env.local`, then run `npm run verify:mt` and restart the dev server.
 
 ## Environment variables
 
@@ -56,6 +56,8 @@ npm run sync:customers
 
 Runs automatically via cron when deployed. Also available from the admin dashboard.
 
+**Bulk customer upload** (admin `/admin`): Excel → MarketTime `POST /customers`. Columns in any order; only name, email, state, and country required per row. See `lib/customer-upload.js` for recognized header aliases.
+
 ## User access model
 
 | Role | Catalog | Prices | Cart | Orders |
@@ -78,6 +80,10 @@ Approval is set manually on the `profiles` row (`approved = true`, `retailer_id`
 ## Vendor minimums
 
 Per-vendor minimum order amounts are configured in `lib/vendor-minimums.js` until MarketTime exposes them via API. Update the `VENDOR_MINIMUMS` map as needed.
+
+## Active manufacturers
+
+Only manufacturers listed in `data/active-manufacturers.csv` (mirrored in `lib/active-manufacturers.js`) appear in the catalog, brands page, and checkout. Update that file when Toys2000 adds or removes a rep line.
 
 ## Database migrations
 
@@ -110,7 +116,7 @@ proxy.js              # Auth gate and guest browse rules
 
 | Symptom | Likely cause |
 |---------|--------------|
-| Checkout 401 on shipping | Stale `MT_API_KEY` in `.env.local` |
+| Checkout 401 on shipping | Invalid/expired `MT_API_KEY` — run `npm run verify:mt` and regenerate key in MarketTime |
 | Empty home categories | MT `rep_group_category_path` is null — home uses manufacturer keyword mapping |
 | Slow catalog load | Ensure `products_catalog_idx` exists; count uses estimated not exact |
 | Sync 401 | Missing or wrong `CRON_SECRET` in env |
