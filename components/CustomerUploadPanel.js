@@ -62,7 +62,9 @@ export default function CustomerUploadPanel() {
       return;
     }
 
-    if (!window.confirm(`Create ${importRows.length} customers in MarketTime? This cannot be undone.`)) {
+    if (!window.confirm(
+      `Create ${importRows.length} customers in MarketTime and assign them to your configured salesperson? This cannot be undone.`
+    )) {
       return;
     }
 
@@ -256,7 +258,9 @@ export default function CustomerUploadPanel() {
                   <td className="px-3 py-1.5">{r.index + 1}</td>
                   <td className="px-3 py-1.5">{r.companyName}</td>
                   <td className={`px-3 py-1.5 ${r.ok ? 'text-green-700' : 'text-red-700'}`}>
-                    {r.ok ? `Created${r.recordID ? ` (${r.recordID})` : ''}` : r.detail?.slice(0, 240)}
+                    {r.ok
+                      ? `${r.detail || 'Created'}${r.recordID ? ` (${r.recordID})` : ''}`
+                      : r.detail?.slice(0, 240)}
                   </td>
                 </tr>
               ))}

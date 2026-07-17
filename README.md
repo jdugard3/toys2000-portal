@@ -27,7 +27,7 @@ Open [http://localhost:3000](http://localhost:3000).
 |----------|---------|
 | `MT_API_KEY` | MarketTime API key (server-only) |
 | `MT_REP_GROUP_ID` | Rep group ID for orders and catalog |
-| `MT_SALESPERSON_ID` | Salesperson ID attached to orders |
+| `MT_SALESPERSON_ID` | Salesperson ID attached to orders and bulk customer imports |
 | `MT_B2B_SIGNUP_URL` | External signup link for new retailers |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser) |
@@ -56,7 +56,13 @@ npm run sync:customers
 
 Runs automatically via cron when deployed. Also available from the admin dashboard.
 
-**Bulk customer upload** (admin `/admin`): Excel → MarketTime `POST /customers`. Columns in any order; only name, email, state, and country required per row. See `lib/customer-upload.js` for recognized header aliases.
+**Bulk customer upload** (admin `/admin`): Excel → MarketTime `POST /customers`, then auto-assigns `MT_SALESPERSON_ID` to each primary ship-to via `repgroupsalespersoncustomer`. Columns in any order; only name, email, state, and country required per row. See `lib/customer-upload.js` for recognized header aliases.
+
+To assign salesperson on customers imported before this step existed:
+
+```bash
+npm run assign:customers -- path/to/customers.xlsx
+```
 
 ## User access model
 
@@ -111,6 +117,7 @@ proxy.js              # Auth gate and guest browse rules
 | `npm run build` | Production build |
 | `npm run sync:mt` | Full MarketTime catalog sync |
 | `npm run sync:customers` | Sync customer/retailer links |
+| `npm run assign:customers -- file.xlsx` | Assign salesperson to uploaded customers |
 
 ## Troubleshooting
 

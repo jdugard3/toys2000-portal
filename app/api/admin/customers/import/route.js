@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { createCustomer } from '@/lib/markettime';
+import { assignSalespersonToCustomerShipTo, createCustomer } from '@/lib/markettime';
+import { getMarketTimeConfig } from '@/lib/markettime-config';
 import { importCustomerBatch, IMPORT_BATCH_SIZE } from '@/lib/customer-upload';
 import { marketTimeErrorResponse } from '@/lib/markettime-errors';
 
@@ -38,8 +39,12 @@ export async function POST(request) {
   }
 
   try {
-    const results = await importCustomerBatch(createCustomer, items);
-    return NextResponse.json({ results });
+    const { salespersonId } = getMarketTimeConfig();
+    const results = await importCustomerBatch(createCustomer, items, {
+      assignSalesperson: salespersonId ? assignSalespersonToCustomerShipTo : null,
+      salespersonId,
+    });
+    return NextResponse.json({ results, salespersonId: salespersonId ?? null });
   } catch (err) {
     console.error('[/api/admin/customers/import]', err);
     if (err.message?.includes('401')) {
