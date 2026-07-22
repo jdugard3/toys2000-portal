@@ -28,7 +28,7 @@ async function main() {
   if (res.status === 401) {
     console.error('');
     console.error('Generate a new API key in MarketTime: Billing & Payment → API Key.');
-    console.error('Update MT_API_KEY in .env and .env.local, then restart npm run dev.');
+    console.error('Update MT_API_KEY in .env, then restart npm run dev.');
     console.error('Run: npm run verify:mt');
   } else {
     console.error(body.slice(0, 300));

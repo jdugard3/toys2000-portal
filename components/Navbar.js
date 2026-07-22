@@ -59,6 +59,11 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
     router.refresh();
   };
 
+  const profileInitials = user?.email
+    ? user.email.slice(0, 2).toUpperCase()
+    : '?';
+  const isProfilePage = pathname === '/profile' || pathname.startsWith('/profile/');
+
   return (
     <>
       <nav className={`navbar${scrolled ? ' navbar-scrolled' : ''}`}>
@@ -70,7 +75,9 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
               <Link href="/catalog" className="nav-link">Shop All</Link>
               <Link href="/catalog/brands" className="nav-link">Brands</Link>
               {user && (
-                <Link href="/orders" className="nav-link">My Orders</Link>
+                <>
+                  <Link href="/orders" className="nav-link">My Orders</Link>
+                </>
               )}
             </div>
           </div>
@@ -107,6 +114,15 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 </button>
+
+                <Link
+                  href="/profile"
+                  className={`nav-profile-btn${isProfilePage ? ' nav-profile-btn-active' : ''}`}
+                  aria-label="My profile"
+                  title="My profile"
+                >
+                  <span className="nav-profile-initials">{profileInitials}</span>
+                </Link>
 
                 {/* Sign out */}
                 <button
@@ -156,7 +172,12 @@ export default function Navbar({ cartCount = 0, onCartOpen }) {
           >
             <Link href="/catalog" className="nav-link" style={{ padding: '8px 0' }}>Shop All</Link>
             <Link href="/catalog/brands" className="nav-link" style={{ padding: '8px 0' }}>Brands</Link>
-            {user && <Link href="/orders" className="nav-link" style={{ padding: '8px 0' }}>My Orders</Link>}
+            {user && (
+              <>
+                <Link href="/orders" className="nav-link" style={{ padding: '8px 0' }}>My Orders</Link>
+                <Link href="/profile" className="nav-link" style={{ padding: '8px 0' }}>Profile</Link>
+              </>
+            )}
             <div style={{ paddingTop: '12px', borderTop: '1px solid var(--glass-border)' }}>
               {user ? (
                 <button onClick={handleSignOut} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0' }}>

@@ -12,14 +12,13 @@ Next.js B2B wholesale portal backed by Supabase (catalog/cart) and MarketTime (o
 
 ```bash
 cp .env.example .env
-cp .env.example .env.local   # Next.js dev reads .env.local first — keep MT_* keys in sync
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-**Important:** If checkout or live MarketTime calls return 401, your `MT_API_KEY` is invalid or expired — not a code bug. Regenerate it in MarketTime (Billing & Payment → API Key), update `.env` and `.env.local`, then run `npm run verify:mt` and restart the dev server.
+**Important:** If checkout or live MarketTime calls return 401, your `MT_API_KEY` is invalid or expired — not a code bug. Regenerate it in MarketTime (Billing & Payment → API Key), update `MT_API_KEY` in `.env`, then run `npm run verify:mt` and restart the dev server.
 
 ## Environment variables
 

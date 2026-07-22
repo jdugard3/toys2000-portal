@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 const PUBLIC_PATHS = ['/', '/login', '/catalog', '/product', '/api'];
 
 // Pages an authenticated-but-unapproved user may view (includes public catalog browsing).
-const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/reset-password', '/catalog', '/product', '/api'];
+const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/reset-password', '/catalog', '/product', '/profile', '/api'];
 
 export async function proxy(req) {
   const res = NextResponse.next({

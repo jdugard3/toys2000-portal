@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getCustomer } from '@/lib/markettime';
+import { marketTimeErrorResponse } from '@/lib/markettime-errors';
 import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
@@ -27,6 +28,6 @@ export async function GET(request, { params }) {
     return NextResponse.json({ customer });
   } catch (err) {
     console.error('[/api/markettime/customer]', err);
-    return NextResponse.json({ error: err.message }, { status: 502 });
+    return marketTimeErrorResponse(err);
   }
 }
