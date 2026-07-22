@@ -24,10 +24,22 @@ export default function PendingApprovalPage() {
           Account pending approval
         </h1>
 
-        <p className="text-sm text-[#5f6980] leading-relaxed mb-6">
+        <p className="text-sm text-[#5f6980] leading-relaxed mb-4">
           Thanks for signing up. Your account is waiting for review by the
-          Toys2000 team. Once your retailer profile is approved, you&apos;ll get
+          Toys2000 team. Once your MarketTime retailer profile is approved, you&apos;ll get
           full access to the catalog, pricing, and ordering.
+        </p>
+
+        <p className="text-sm text-[#5f6980] leading-relaxed mb-6">
+          Haven&apos;t completed MarketTime registration yet?{' '}
+          <Link href="/register" className="text-[#00aeef] font-semibold hover:underline">
+            Start here
+          </Link>
+          . You can also{' '}
+          <Link href="/profile" className="text-[#00aeef] font-semibold hover:underline">
+            view your profile
+          </Link>
+          {' '}to see if your MarketTime account is linked.
         </p>
 
         <p className="text-xs text-[#8b94a8] mb-8">

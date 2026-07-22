@@ -1,5 +1,6 @@
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server';
 import { getMarketTimeConfig } from '@/lib/markettime-config';
+import { ensureDefaultSalesperson } from '@/lib/assign-default-salesperson';
 import { NextResponse } from 'next/server';
 
 const BASE_URL = 'https://publicapi.markettime.com/mtpublic/api/v1';
@@ -103,9 +104,18 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  let salespersonAssigned = false;
+  try {
+    const result = await ensureDefaultSalesperson(customer.recordID);
+    salespersonAssigned = result.assigned === true;
+  } catch (err) {
+    console.warn('[/api/profile/link-markettime] salesperson assign skipped:', err.message);
+  }
+
   return NextResponse.json({
     linked: true,
     approved,
     retailerID: customer.recordID,
+    salespersonAssigned,
   });
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { createBrowserClient } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -19,6 +20,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/catalog';
   const errorParam = searchParams.get('error');
+  const modeParam = searchParams.get('mode');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +28,10 @@ function LoginForm() {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
 
   const supabase = createBrowserClient();
+
+  useEffect(() => {
+    if (modeParam === 'signup') setMode('signup');
+  }, [modeParam]);
 
   const linkMarketTimeProfile = async () => {
     try {
@@ -35,7 +41,9 @@ function LoginForm() {
       if (data.linked && data.approved) {
         toast.success('MarketTime account linked.');
       } else if (data.linked && !data.approved) {
-        toast('MarketTime account found, but it is still pending approval.');
+        toast('MarketTime account found — pending Toys2000 approval.');
+      } else if (data.reason === 'not_found') {
+        toast('No MarketTime account found for this email. Register on MarketTime first, then try again.');
       } else if (data.reason === 'api_error') {
         // Non-fatal — catalog still works from Supabase
         console.warn('MarketTime link skipped:', data.message);
@@ -67,7 +75,7 @@ function LoginForm() {
         if (data.session) {
           await linkMarketTimeProfile();
           toast.success('Portal account created.');
-          router.push(redirect);
+          router.push('/pending-approval');
           router.refresh();
         } else {
           toast.success('Check your email to confirm your portal account.');
@@ -138,8 +146,19 @@ function LoginForm() {
           <p className="text-sm text-[#5f6980] text-center mb-8">
             {mode === 'login'
               ? 'Sign in to your wholesale account'
-              : 'Set up your portal login'}
+              : 'Step 2 — use the same email as your MarketTime registration'}
           </p>
+
+          {mode === 'signup' && (
+            <div className="mb-6 px-4 py-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-xl text-sm text-[#0c4a6e]">
+              <p className="font-semibold">Haven&apos;t registered on MarketTime yet?</p>
+              <p className="mt-1">
+                <Link href="/register" className="text-[#00aeef] font-semibold hover:underline">
+                  Start with step 1 — Register with Toys2000
+                </Link>
+              </p>
+            </div>
+          )}
 
           {errorParam === 'auth_callback_failed' && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -208,25 +227,23 @@ function LoginForm() {
             {mode === 'login' ? (
               <div className="space-y-2">
                 <p>
-                  Already approved by MarketTime?{' '}
+                  New to Toys2000?{' '}
+                  <Link
+                    href="/register"
+                    className="text-[#f15a24] font-semibold hover:underline"
+                  >
+                    Register here
+                  </Link>
+                </p>
+                <p>
+                  Already on MarketTime?{' '}
                   <button
                     type="button"
                     onClick={() => setMode('signup')}
-                    className="text-[#f15a24] font-semibold hover:underline"
+                    className="text-[#00aeef] font-semibold hover:underline"
                   >
                     Create portal login
                   </button>
-                </p>
-                <p>
-                  Need approval first?{' '}
-                  <a
-                    href="/api/register"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#00aeef] font-semibold hover:underline"
-                  >
-                    Register with Toys2000
-                  </a>
                 </p>
               </div>
             ) : (

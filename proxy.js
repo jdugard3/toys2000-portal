@@ -2,10 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 // Pages reachable without signing in.
-const PUBLIC_PATHS = ['/', '/login', '/catalog', '/product', '/api'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/catalog', '/product', '/api'];
 
 // Pages an authenticated-but-unapproved user may view (includes public catalog browsing).
-const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/pending-approval', '/reset-password', '/catalog', '/product', '/profile', '/api'];
+const APPROVAL_EXEMPT_PATHS = ['/', '/login', '/register', '/pending-approval', '/reset-password', '/catalog', '/product', '/profile', '/api'];
 
 export async function proxy(req) {
   const res = NextResponse.next({
