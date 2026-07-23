@@ -4,9 +4,10 @@ import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/components/CartProvider';
-import FreightNudge from '@/components/FreightNudge';
+import OrderPromotions from '@/components/OrderPromotions';
+import PromotionSuggestions from '@/components/PromotionSuggestions';
 import { groupByManufacturer, vendorSubtotal, formatCurrency, snapQuantity } from '@/lib/cart';
-import { getVendorMinimum, meetsVendorMinimum } from '@/lib/vendor-minimums';
+import { useManufacturerCheckoutInfos } from '@/lib/use-manufacturer-checkout-info';
 
 export default function CartPage() {
   const { cartItems, updateQuantity, removeFromCart, clearCart, loading } = useCart();
@@ -22,6 +23,11 @@ export default function CartPage() {
   }, []);
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
+  const manufacturerIds = useMemo(
+    () => Object.keys(grouped),
+    [grouped]
+  );
+  const { byId: checkoutInfoById, loading: checkoutInfoLoading } = useManufacturerCheckoutInfos(manufacturerIds);
   const grandTotal = cartItems.reduce((s, i) => s + i.unit_price * i.quantity, 0);
 
   if (loading) {
@@ -77,7 +83,9 @@ export default function CartPage() {
           <div className="lg:col-span-2 space-y-6">
             {Object.values(grouped).map((group) => {
               const subtotal = vendorSubtotal(group.items);
-              const minimum = getVendorMinimum(group.manufacturerID);
+              const checkoutInfo = checkoutInfoById[group.manufacturerID];
+              const minimum = checkoutInfo?.minimumOrderAmount ?? 0;
+              const promotions = checkoutInfo?.promotions ?? [];
               const belowMin = minimum > 0 && subtotal < minimum;
               const isActiveVendor = activeManufacturerIds
                 ? activeManufacturerIds.has(group.manufacturerID)
@@ -125,11 +133,23 @@ export default function CartPage() {
                       </div>
                     )}
 
-                    <FreightNudge
-                      promotions={[]}
-                      subtotal={subtotal}
-                      manufacturerName={group.manufacturerName}
-                    />
+                    {!checkoutInfoLoading && (
+                      <OrderPromotions
+                        promotions={promotions}
+                        subtotal={subtotal}
+                        manufacturerName={group.manufacturerName}
+                      />
+                    )}
+
+                    {!checkoutInfoLoading && (
+                      <PromotionSuggestions
+                        manufacturerID={group.manufacturerID}
+                        manufacturerName={group.manufacturerName}
+                        subtotal={subtotal}
+                        promotions={promotions}
+                        cartItemIds={group.items.map((item) => item.item_id)}
+                      />
+                    )}
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-[#1a1d26]">

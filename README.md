@@ -82,9 +82,14 @@ Approval is set manually on the `profiles` row (`approved = true`, `retailer_id`
 - Sync endpoints require `CRON_SECRET` only (not the service role key).
 - Checkout sends an `Idempotency-Key` header to prevent duplicate orders on double-submit. Requires the `order_idempotency` table in Supabase (included in `schema.sql`).
 
-## Vendor minimums
+## Vendor minimums & promotions
 
-Per-vendor minimum order amounts are configured in `lib/vendor-minimums.js` until MarketTime exposes them via API. Update the `VENDOR_MINIMUMS` map as needed.
+Per-vendor **minimum order amounts** and **promotions** are loaded live from MarketTime when viewing the cart or checkout:
+
+- Minimum: `GET /manufacturers/{manufacturerID}` → `minimumOrderAmount`
+- Promotions: `POST /manufacturers/promotions/get` → free freight thresholds, discounts, etc.
+
+API route: `GET /api/markettime/manufacturer/{id}/checkout-info`
 
 ## Active manufacturers
 

@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { generatePO } from '@/lib/po-number';
 import { formatCurrency, vendorSubtotal } from '@/lib/cart';
-import { getVendorMinimum } from '@/lib/vendor-minimums';
 import { formatPaymentTermsLabel } from '@/lib/payment-terms';
-import FreightNudge from './FreightNudge';
+import OrderPromotions from './OrderPromotions';
+import { useManufacturerCheckoutInfo } from '@/lib/use-manufacturer-checkout-info';
 import toast from 'react-hot-toast';
 
 import { getShipToRecordId } from '@/lib/build-markettime-order';
@@ -35,12 +35,16 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
   const [acceptBackOrder, setAcceptBackOrder] = useState(true);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [orderPromos, setOrderPromos] = useState([]);
   const [paymentTermsLabel, setPaymentTermsLabel] = useState('Net 30');
   const idempotencyKeyRef = useRef(null);
 
+  const {
+    minimumOrderAmount: minimum,
+    promotions,
+    loading: checkoutInfoLoading,
+  } = useManufacturerCheckoutInfo(manufacturerID);
+
   const subtotal = vendorSubtotal(items);
-  const minimum = getVendorMinimum(manufacturerID);
   const belowMinimum = minimum > 0 && subtotal < minimum;
 
   useEffect(() => {
@@ -127,11 +131,7 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
         throw new Error(data.error || 'Order submission failed');
       }
 
-      // Capture any promotions from the response for the freight nudge
-      if (data.order?.orderPromotions?.length) {
-        setOrderPromos(data.order.orderPromotions);
-      }
-
+      // Order placed — promotions were already shown pre-submit from MT checkout-info
       clearIdempotencyKey(manufacturerID);
       toast.success(`Order placed with ${manufacturerName}!`);
       onSuccess?.(data.order);
@@ -172,9 +172,14 @@ export default function CheckoutForm({ group, customer, shipTos = [], shippingMe
         )}
       </div>
 
-      {/* Freight nudge (shown if promotions loaded) */}
-      {orderPromos.length > 0 && (
-        <FreightNudge promotions={orderPromos} subtotal={subtotal} manufacturerName={manufacturerName} />
+      {/* Promotions + freight thresholds from MarketTime */}
+      {!checkoutInfoLoading && (
+        <OrderPromotions
+          promotions={promotions}
+          subtotal={subtotal}
+          manufacturerName={manufacturerName}
+          mode="checkout"
+        />
       )}
 
       {/* Payment terms — read-only */}

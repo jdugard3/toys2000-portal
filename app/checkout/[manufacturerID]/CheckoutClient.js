@@ -14,6 +14,7 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
   const [shippingMethods, setShippingMethods] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(null);
+  const [completingOrder, setCompletingOrder] = useState(false);
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
   const vendorGroup = grouped[manufacturerID];
@@ -49,15 +50,19 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
   }, [profile?.retailer_id, manufacturerID]);
 
   const handleSuccess = async (order) => {
-    // Clear this vendor's items from cart
+    const orderId = order.recordID ?? order.id;
+    setCompletingOrder(true);
+    router.push(`/orders/${orderId}`);
     await clearCart(manufacturerID);
-    router.push(`/orders/${order.recordID ?? order.id}`);
   };
 
-  if (loading || dataLoading) {
+  if (loading || dataLoading || completingOrder) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
         <div className="w-8 h-8 border-2 border-[#f15a24] border-t-transparent rounded-full animate-spin" />
+        {completingOrder && (
+          <p className="text-sm text-[#5f6980]">Order placed! Taking you to your order…</p>
+        )}
       </div>
     );
   }

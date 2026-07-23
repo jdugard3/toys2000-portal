@@ -39,11 +39,13 @@ create trigger on_auth_user_created
 -- Used for brand nav, logo display, and checkout dropdowns.
 
 create table if not exists manufacturers (
-  manufacturer_id   text primary key,       -- MT format e.g. "M999864"
-  name              text not null,
-  logo_url          text,
-  raw               jsonb,                  -- full MT manufacturer response
-  last_synced_at    timestamptz not null default now()
+  manufacturer_id          text primary key,       -- MT format e.g. "M999864"
+  name                     text not null,
+  logo_url                 text,
+  minimum_order_amount     numeric(10, 2),
+  minimum_reorder_amount   numeric(10, 2),
+  raw                      jsonb,                  -- full MT manufacturer response
+  last_synced_at           timestamptz not null default now()
 );
 
 

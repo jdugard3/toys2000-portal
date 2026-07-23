@@ -20,6 +20,10 @@ Update this file when items are started, shipped, or reprioritized.
 - [x] Profile navbar button — initials emblem when signed in
 - [x] MarketTime-first signup flow — `/register` guide, login copy, pending-approval links
 - [x] Default salesperson on account link — `ensureDefaultSalesperson()` on `link-markettime`
+- [x] Vendor minimums from MarketTime — `minimumOrderAmount` on checkout/cart via live MT API
+- [x] Promotions at checkout — `POST /manufacturers/promotions/get` shown on cart + checkout
+
+> **Note:** Browse Catalog → PDF/Flipsnack is handled in Juan's version (upcoming switch) — not building here.
 
 ---
 
@@ -28,13 +32,62 @@ Update this file when items are started, shipped, or reprioritized.
 | Status | Item | Notes |
 |--------|------|-------|
 | ⬜ | **Approval email** | Email customer when Jimmy approves them in MarketTime |
-| ⬜ | **Browse Catalog → PDF / Flipsnack** | Wire catalog browse to `CatalogViewer.js` instead of product grid where appropriate |
-| ⬜ | **Vendor minimums from MarketTime** | `lib/vendor-minimums.js` is a static map today; pull from MT when available |
+| ~~⬜~~ | ~~Browse Catalog → PDF / Flipsnack~~ | **Deferred** — in Juan's version |
+| ~~⬜~~ | ~~**Vendor minimums from MarketTime**~~ | ✅ Done — live from `GET /manufacturers/{id}` |
 | ⬜ | **Multi-vendor checkout tabs** | Checkout is per-manufacturer; improve multi-brand cart UX |
 | ⬜ | **B2B order email notifications** | Email Jimmy (and/or customer) when orders are placed |
-| ⬜ | **Promotions at checkout** | Show promos before submit — blocked on MT data source (`promotions={[]}` today) |
+| ~~⬜~~ | ~~**Promotions at checkout**~~ | ✅ Done — `manufacturers/promotions/get` on cart + checkout |
 | ⬜ | **MT ↔ portal bidirectional sync test** | Verify email/profile changes propagate correctly both ways |
 | ⬜ | **Add ship-to / contact (profile)** | Profile v2 edits existing records only; need POST endpoints for new locations |
+| ⬜ | **MarketTime API key stability** | Keys failing ~daily without regeneration — escalate to MT support if fingerprint unchanged |
+
+---
+
+## MarketTime API key — troubleshooting
+
+**Symptom:** Checkout, profile, or `npm run verify:mt` fails with 401.
+
+### Is it a timer or usage limit?
+
+**Probably not.** MarketTime’s public docs do not describe:
+- Daily or timed API key expiry
+- Usage quotas that **revoke** your key
+
+What they *do* document:
+- Regenerating a key **immediately invalidates** the previous one ([Generating an API Key](https://support.markettime.com/hc/en-us/articles/43441619857947-Generating-an-API-Key-for-your-MarketTime-Account))
+- Rate limits (if any) would typically return **HTTP 429**, not **401**
+
+| HTTP status | Meaning |
+|-------------|---------|
+| **401** | Key missing, wrong, or revoked — auth failure |
+| **429** | Too many requests — wait and retry; do **not** regenerate the key |
+| **5xx** | MarketTime server error — retry later |
+
+### Diagnose before regenerating
+
+```bash
+npm run verify:mt
+```
+
+Note the **Key fingerprint** line. Next time it fails:
+
+| Fingerprint | 401? | Likely cause |
+|-------------|------|----------------|
+| **Same** as yesterday | Yes | MarketTime revoked key server-side → **open MT support ticket** |
+| **Different** | Yes | `.env` was changed, reverted, or wrong machine — fix env, not MT |
+| Same | No | Transient error — retry |
+
+### Things that feel like “daily expiry” but aren’t
+
+1. **Another user** clicks Generate Key in MarketTime (Jimmy, integrator, etc.)
+2. **Two environments** — local `.env` updated but Vercel still has old key (or vice versa)
+3. **`.env.local` returns** — Next.js prefers it over `.env`; keep only one file with `MT_*` vars
+4. **iCloud / sync** reverting `.env` on another Mac
+5. **Elite subscription / billing** — API access tied to plan; ask MT if account is on trial
+
+### Escalation template for MarketTime support
+
+> Our Sales Agency Elite API key for rep group R1359 stops working with HTTP 401 approximately every 24 hours without anyone clicking Generate Key. Is there a key TTL, trial limit, or automatic rotation on your side? Key fingerprint (SHA-256 prefix): `[paste from verify:mt]`
 
 ---
 

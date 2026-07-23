@@ -98,6 +98,8 @@ async function runSync({ modifiedStartDate, isFull }) {
         manufacturer_id: m.manufacturerID ?? m.recordID,
         name: m.name ?? m.manufacturerName,
         logo_url: m.logoUrl ?? m.logoURL ?? null,
+        minimum_order_amount: m.minimumOrderAmount ?? null,
+        minimum_reorder_amount: m.minimumReorderAmount ?? null,
         raw: m,
         last_synced_at: new Date().toISOString(),
       }));
