@@ -1,11 +1,14 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { runCatalogSync } from '@/lib/sync-catalog';
 import { NextResponse } from 'next/server';
+
+export const maxDuration = 300;
 
 /**
  * POST /api/sync/trigger
  * Admin-only UI trigger for manual catalog sync.
  * Verifies the user is logged in and has is_admin = true,
- * then calls the sync route internally.
+ * then runs the sync in-process (avoids HTTP self-fetch timeouts).
  *
  * Pass ?full=true for a full re-pull (no modifiedStartDate).
  * Default is a delta sync from yesterday.
@@ -31,25 +34,12 @@ export async function POST(request) {
   const { searchParams } = new URL(request.url);
   const full = searchParams.get('full') === 'true';
 
-  // Build delta date (yesterday) for incremental syncs
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const modifiedStartDate = yesterday.toISOString().split('T')[0];
 
-  const syncUrl = new URL('/api/sync', request.url);
-  if (!full) {
-    syncUrl.searchParams.set('modifiedStartDate', modifiedStartDate);
-  } else {
-    syncUrl.searchParams.set('full', 'true');
-  }
-
-  const syncRes = await fetch(syncUrl.toString(), {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
+  return runCatalogSync({
+    modifiedStartDate: full ? null : modifiedStartDate,
+    isFull: full,
   });
-
-  const result = await syncRes.json();
-  return NextResponse.json(result, { status: syncRes.status });
 }

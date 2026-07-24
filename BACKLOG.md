@@ -22,6 +22,11 @@ Update this file when items are started, shipped, or reprioritized.
 - [x] Default salesperson on account link — `ensureDefaultSalesperson()` on `link-markettime`
 - [x] Vendor minimums from MarketTime — `minimumOrderAmount` on checkout/cart via live MT API
 - [x] Promotions at checkout — `POST /manufacturers/promotions/get` shown on cart + checkout
+- [x] Cart promotion add-on suggestions — nearest-threshold catalog picks on `/cart`
+- [x] Orders page filter dropdown — status + brand filters
+- [x] Approval email — Resend notification when profile becomes approved
+- [x] B2B order email notifications — Jimmy + customer on order placed
+- [x] Multi-vendor checkout tabs — vendor tabs on cart + checkout
 
 > **Note:** Browse Catalog → PDF/Flipsnack is handled in Juan's version (upcoming switch) — not building here.
 
@@ -31,11 +36,11 @@ Update this file when items are started, shipped, or reprioritized.
 
 | Status | Item | Notes |
 |--------|------|-------|
-| ⬜ | **Approval email** | Email customer when Jimmy approves them in MarketTime |
+| ⬜ | **Approval email** | ✅ Done — Resend on MT sync, admin approve, or link-markettime |
 | ~~⬜~~ | ~~Browse Catalog → PDF / Flipsnack~~ | **Deferred** — in Juan's version |
 | ~~⬜~~ | ~~**Vendor minimums from MarketTime**~~ | ✅ Done — live from `GET /manufacturers/{id}` |
-| ⬜ | **Multi-vendor checkout tabs** | Checkout is per-manufacturer; improve multi-brand cart UX |
-| ⬜ | **B2B order email notifications** | Email Jimmy (and/or customer) when orders are placed |
+| ~~⬜~~ | ~~**Multi-vendor checkout tabs**~~ | ✅ Done — vendor tabs on cart + checkout |
+| ~~⬜~~ | ~~**B2B order email notifications**~~ | ✅ Done — Resend to `ORDER_NOTIFY_EMAIL` + customer |
 | ~~⬜~~ | ~~**Promotions at checkout**~~ | ✅ Done — `manufacturers/promotions/get` on cart + checkout |
 | ⬜ | **MT ↔ portal bidirectional sync test** | Verify email/profile changes propagate correctly both ways |
 | ⬜ | **Add ship-to / contact (profile)** | Profile v2 edits existing records only; need POST endpoints for new locations |
@@ -63,13 +68,44 @@ What they *do* document:
 | **429** | Too many requests — wait and retry; do **not** regenerate the key |
 | **5xx** | MarketTime server error — retry later |
 
-### Diagnose before regenerating
+### Monitor over time (catch the next failure)
 
 ```bash
-npm run verify:mt
+npm run monitor:mt    # logs to logs/mt-key-health.jsonl + prints diagnosis
+npm run verify:mt     # quick one-off check
 ```
 
-Note the **Key fingerprint** line. Next time it fails:
+**Current key fingerprint (after 2026-06-23 regen):** `ebd2f9954dc3`  
+**Previous (failed overnight):** `ebbee6bf8f73` — same fingerprint, 401 = revoked without local `.env` change
+
+Run `monitor:mt` once a day (or add to a calendar). When it fails, compare fingerprints in the log.
+
+**Production (Vercel)** — compare deployment key to local:
+
+```bash
+curl -s -H "Authorization: Bearer $CRON_SECRET" https://YOUR-PORTAL.vercel.app/api/health/mt
+```
+
+If production `fingerprint` ≠ local `verify:mt` fingerprint, someone updated only one environment.
+
+**Vercel cron** hits `/api/sync` daily at 4:00 UTC. If the key dies overnight, check Vercel → Project → Logs around that time for `MarketTime API error: 401`.
+
+### Investigation checklist (ask Jimmy)
+
+1. Did anyone open **Billing & Payment → API Key → Generate Key** in the last 24h?
+2. Is anyone else integrating with the same rep group (another dev, Juan’s version, Postman)?
+3. Is the **Sales Agency Elite** subscription active (not trial lapsed)?
+4. After regenerating, did you update **both** local `.env` **and** Vercel `MT_API_KEY`?
+
+### Team rule to prevent repeats
+
+When regenerating in MarketTime:
+1. Copy new key to **local `.env` and Vercel** in the same session
+2. Run `npm run verify:mt` locally
+3. `curl` `/api/health/mt` on production
+4. Note the new fingerprint in Slack/email so everyone knows the old key is dead
+
+MarketTime only shows the key **once** at generation — there is no “view existing key” UI.
 
 | Fingerprint | 401? | Likely cause |
 |-------------|------|----------------|
@@ -123,6 +159,10 @@ Note the **Key fingerprint** line. Next time it fails:
 | `MT_REP_GROUP_ID` | Rep group (e.g. `R1359`) |
 | `MT_SALESPERSON_ID` | Default rep on orders & imports (e.g. `S148431`) |
 | `MT_B2B_SIGNUP_URL` | External MarketTime retailer signup link |
+| `RESEND_API_KEY` | Resend API for approval + order emails |
+| `EMAIL_FROM` | Sender address for transactional email |
+| `ORDER_NOTIFY_EMAIL` | Jimmy / ops inbox for new order alerts |
+| `NEXT_PUBLIC_SITE_URL` | Portal base URL in email links |
 
 ---
 
@@ -131,6 +171,7 @@ Note the **Key fingerprint** line. Next time it fails:
 ```bash
 npm run dev          # local dev server
 npm run verify:mt    # test MarketTime API key
+npm run monitor:mt   # log key health + diagnosis to logs/mt-key-health.jsonl
 ```
 
 | Route | Purpose |
@@ -148,4 +189,4 @@ npm run verify:mt    # test MarketTime API key
 2. Add new items with a one-line **Notes** column so context isn't lost across machines.
 3. Commit and push so the list stays in sync everywhere.
 
-*Last updated: 2026-06-22*
+*Last updated: 2026-06-23*

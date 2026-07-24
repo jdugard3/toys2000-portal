@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '@/components/CartProvider';
 import CheckoutForm from '@/components/CheckoutForm';
-import { groupByManufacturer } from '@/lib/cart';
+import VendorCheckoutTabs from '@/components/VendorCheckoutTabs';
+import { groupByManufacturer, vendorSubtotal } from '@/lib/cart';
 
 export default function CheckoutClient({ manufacturerID, manufacturerName, profile }) {
   const router = useRouter();
@@ -18,6 +19,16 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
   const vendorGroup = grouped[manufacturerID];
+  const vendorTabs = useMemo(() => (
+    Object.values(grouped)
+      .sort((a, b) => a.manufacturerName.localeCompare(b.manufacturerName))
+      .map((group) => ({
+        manufacturerID: group.manufacturerID,
+        manufacturerName: group.manufacturerName,
+        subtotal: vendorSubtotal(group.items),
+        itemCount: group.items.reduce((sum, item) => sum + item.quantity, 0),
+      }))
+  ), [grouped]);
 
   useEffect(() => {
     if (!profile?.retailer_id) { setDataLoading(false); return; }
@@ -117,6 +128,12 @@ export default function CheckoutClient({ manufacturerID, manufacturerName, profi
         <h1 className="text-3xl font-bold text-[#1a1d26] mb-6" style={{ fontFamily: "'Baloo 2', cursive" }}>
           Checkout
         </h1>
+
+        <VendorCheckoutTabs
+          vendors={vendorTabs}
+          activeId={manufacturerID}
+          mode="checkout"
+        />
 
         <CheckoutForm
           group={vendorGroup}

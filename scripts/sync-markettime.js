@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { toModifiedStartDateMs } from '../lib/markettime.js';
 
 const BASE_URL = 'https://publicapi.markettime.com/mtpublic/api/v1';
 const PAGE_SIZE = 250;
@@ -76,6 +77,16 @@ function mapManufacturer(m) {
     raw: m,
     last_synced_at: new Date().toISOString(),
   };
+}
+
+function dedupeByKey(rows, key) {
+  const byKey = new Map();
+  for (const row of rows) {
+    const id = row[key];
+    if (id == null || id === '') continue;
+    byKey.set(String(id), row);
+  }
+  return [...byKey.values()];
 }
 
 function mapProduct(item) {
@@ -165,9 +176,10 @@ async function main() {
       : manufacturerResponse?.records ?? [];
 
     if (manufacturers.length) {
+      const mfrRows = dedupeByKey(manufacturers.map(mapManufacturer), 'manufacturer_id');
       const { error } = await db
         .from('manufacturers')
-        .upsert(manufacturers.map(mapManufacturer), { onConflict: 'manufacturer_id' });
+        .upsert(mfrRows, { onConflict: 'manufacturer_id' });
 
       if (error) throw new Error(`Manufacturer upsert failed: ${error.message}`);
       manufacturersSynced = manufacturers.length;
@@ -183,7 +195,7 @@ async function main() {
       });
 
       if (modifiedStartDate && !isFull) {
-        params.set('modifiedStartDate', modifiedStartDate);
+        params.set('modifiedStartDate', String(toModifiedStartDateMs(modifiedStartDate)));
       }
 
       const response = await mtFetch(`/items?${params}`);
@@ -200,7 +212,7 @@ async function main() {
       // stale `discontinued = false` row forever and stayed visible in the
       // catalog. The customer-facing /api/catalog query already filters on
       // show_on_website and discontinued, so storing them is safe.
-      const products = records.map(mapProduct);
+      const products = dedupeByKey(records.map(mapProduct), 'record_id');
 
       if (products.length) {
         await upsertManufacturerPlaceholders(products);

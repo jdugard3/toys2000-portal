@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useCart } from '@/components/CartProvider';
 import OrderPromotions from '@/components/OrderPromotions';
 import PromotionSuggestions from '@/components/PromotionSuggestions';
+import VendorCheckoutTabs from '@/components/VendorCheckoutTabs';
 import { groupByManufacturer, vendorSubtotal, formatCurrency, snapQuantity } from '@/lib/cart';
 import { useManufacturerCheckoutInfos } from '@/lib/use-manufacturer-checkout-info';
 
@@ -23,12 +24,50 @@ export default function CartPage() {
   }, []);
 
   const grouped = useMemo(() => groupByManufacturer(cartItems), [cartItems]);
-  const manufacturerIds = useMemo(
-    () => Object.keys(grouped),
+  const vendorGroups = useMemo(
+    () => Object.values(grouped).sort((a, b) => a.manufacturerName.localeCompare(b.manufacturerName)),
     [grouped]
   );
+  const manufacturerIds = useMemo(
+    () => vendorGroups.map((group) => group.manufacturerID),
+    [vendorGroups]
+  );
+  const [activeVendorId, setActiveVendorId] = useState(null);
+
+  useEffect(() => {
+    if (!vendorGroups.length) {
+      setActiveVendorId(null);
+      return;
+    }
+    setActiveVendorId((current) => (
+      current && vendorGroups.some((group) => group.manufacturerID === current)
+        ? current
+        : vendorGroups[0].manufacturerID
+    ));
+  }, [vendorGroups]);
   const { byId: checkoutInfoById, loading: checkoutInfoLoading } = useManufacturerCheckoutInfos(manufacturerIds);
   const grandTotal = cartItems.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+
+  const vendorTabs = useMemo(() => vendorGroups.map((group) => {
+    const subtotal = vendorSubtotal(group.items);
+    const minimum = checkoutInfoById[group.manufacturerID]?.minimumOrderAmount ?? 0;
+    const isActiveVendor = activeManufacturerIds
+      ? activeManufacturerIds.has(group.manufacturerID)
+      : true;
+    const belowMin = minimum > 0 && subtotal < minimum;
+
+    return {
+      manufacturerID: group.manufacturerID,
+      manufacturerName: group.manufacturerName,
+      subtotal,
+      itemCount: group.items.reduce((sum, item) => sum + item.quantity, 0),
+      ready: isActiveVendor && !belowMin,
+    };
+  }), [vendorGroups, checkoutInfoById, activeManufacturerIds]);
+
+  const activeGroup = vendorGroups.find((group) => group.manufacturerID === activeVendorId)
+    ?? vendorGroups[0]
+    ?? null;
 
   if (loading) {
     return (
@@ -79,9 +118,16 @@ export default function CartPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Vendor groups */}
           <div className="lg:col-span-2 space-y-6">
-            {Object.values(grouped).map((group) => {
+            <VendorCheckoutTabs
+              vendors={vendorTabs}
+              activeId={activeGroup?.manufacturerID}
+              mode="cart"
+              onSelect={setActiveVendorId}
+            />
+
+            {activeGroup && (() => {
+              const group = activeGroup;
               const subtotal = vendorSubtotal(group.items);
               const checkoutInfo = checkoutInfoById[group.manufacturerID];
               const minimum = checkoutInfo?.minimumOrderAmount ?? 0;
@@ -173,7 +219,7 @@ export default function CartPage() {
                   </div>
                 </div>
               );
-            })}
+            })()}
           </div>
 
           {/* Order summary sidebar */}
@@ -182,12 +228,47 @@ export default function CartPage() {
               <h2 className="font-bold text-[#1a1d26] mb-4" style={{ fontFamily: "'Baloo 2', cursive" }}>
                 Order Summary
               </h2>
-              {Object.values(grouped).map((group) => (
-                <div key={group.manufacturerID} className="flex justify-between text-sm mb-2">
-                  <span className="text-[#5f6980] truncate mr-2">{group.manufacturerName}</span>
-                  <span className="font-semibold text-[#1a1d26] flex-shrink-0">{formatCurrency(vendorSubtotal(group.items))}</span>
-                </div>
-              ))}
+              {vendorGroups.map((group) => {
+                const subtotal = vendorSubtotal(group.items);
+                const checkoutInfo = checkoutInfoById[group.manufacturerID];
+                const minimum = checkoutInfo?.minimumOrderAmount ?? 0;
+                const isActiveVendor = activeManufacturerIds
+                  ? activeManufacturerIds.has(group.manufacturerID)
+                  : true;
+                const belowMin = minimum > 0 && subtotal < minimum;
+                const canCheckout = isActiveVendor && !belowMin;
+                const isActive = group.manufacturerID === activeGroup?.manufacturerID;
+
+                return (
+                  <div
+                    key={group.manufacturerID}
+                    className={`flex items-center justify-between gap-2 text-sm mb-2 rounded-lg px-2 py-1.5 -mx-2 ${
+                      isActive ? 'bg-[#fff5f0]' : ''
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setActiveVendorId(group.manufacturerID)}
+                      className="text-left flex-1 min-w-0"
+                    >
+                      <span className={`truncate mr-2 block ${isActive ? 'text-[#1a1d26] font-semibold' : 'text-[#5f6980]'}`}>
+                        {group.manufacturerName}
+                      </span>
+                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-semibold text-[#1a1d26]">{formatCurrency(subtotal)}</span>
+                      {canCheckout && (
+                        <Link
+                          href={`/checkout/${group.manufacturerID}`}
+                          className="text-xs font-bold text-[#f15a24] hover:underline no-underline"
+                        >
+                          Checkout
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               <div className="border-t border-black/[0.06] pt-3 mt-3 flex justify-between font-bold text-[#1a1d26]">
                 <span style={{ fontFamily: "'Baloo 2', cursive" }}>Total</span>
                 <span>{formatCurrency(grandTotal)}</span>

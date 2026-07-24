@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { assignSalespersonToCustomerShipTo, createCustomer } from '@/lib/markettime';
+import { assignSalespersonToCustomerShipTo, approveCustomerForRepGroup, createCustomer } from '@/lib/markettime';
 import { getMarketTimeConfig } from '@/lib/markettime-config';
 import { importCustomerBatch, IMPORT_BATCH_SIZE } from '@/lib/customer-upload';
 import { marketTimeErrorResponse } from '@/lib/markettime-errors';
@@ -43,6 +43,7 @@ export async function POST(request) {
     const results = await importCustomerBatch(createCustomer, items, {
       assignSalesperson: salespersonId ? assignSalespersonToCustomerShipTo : null,
       salespersonId,
+      approveCustomer: approveCustomerForRepGroup,
     });
     return NextResponse.json({ results, salespersonId: salespersonId ?? null });
   } catch (err) {

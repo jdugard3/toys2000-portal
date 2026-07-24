@@ -1,6 +1,7 @@
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server';
 import { getMarketTimeConfig } from '@/lib/markettime-config';
 import { ensureDefaultSalesperson } from '@/lib/assign-default-salesperson';
+import { notifyApprovalIfNeeded } from '@/lib/notify-approval';
 import { NextResponse } from 'next/server';
 
 const BASE_URL = 'https://publicapi.markettime.com/mtpublic/api/v1';
@@ -11,7 +12,9 @@ function isApprovedCustomer(customer) {
     customer.active !== false &&
     customer.status !== 'INACTIVE' &&
     customer.recordDeleted !== true &&
-    (customer.approvedByRepGroup === true || customer.approved === true)
+    (customer.approvedByRepGroup === true
+      || customer.approvedByRepGroup === 1
+      || customer.approved === true)
   );
 }
 
@@ -91,6 +94,14 @@ export async function POST() {
   const approved = isApprovedCustomer(customer);
   const admin = createAdminClient();
 
+  const { data: existingProfile } = await admin
+    .from('profiles')
+    .select('approved')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const wasApproved = existingProfile?.approved === true;
+
   const { error } = await admin
     .from('profiles')
     .upsert({
@@ -110,6 +121,18 @@ export async function POST() {
     salespersonAssigned = result.assigned === true;
   } catch (err) {
     console.warn('[/api/profile/link-markettime] salesperson assign skipped:', err.message);
+  }
+
+  try {
+    await notifyApprovalIfNeeded(admin, {
+      userId: user.id,
+      email: user.email,
+      companyName: customer.name ?? customer.dba ?? null,
+      wasApproved,
+      nowApproved: approved,
+    });
+  } catch (emailErr) {
+    console.warn('[/api/profile/link-markettime] approval email failed:', emailErr.message);
   }
 
   return NextResponse.json({

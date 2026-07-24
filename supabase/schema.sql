@@ -15,6 +15,7 @@ create table if not exists profiles (
   company_name      text,
   approved          boolean not null default false,
   is_admin          boolean not null default false,
+  approval_email_sent_at timestamptz,
   created_at        timestamptz not null default now()
 );
 

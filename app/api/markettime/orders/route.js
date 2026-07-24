@@ -3,6 +3,7 @@ import { createOrder, getCustomer, getCustomerShipTos } from '@/lib/markettime';
 import { buildMarketTimeOrder, getShipToRecordId } from '@/lib/build-markettime-order';
 import { validateAndNormalizeOrderDetails } from '@/lib/validate-order';
 import { getActiveManufacturers, isActiveManufacturerId } from '@/lib/active-manufacturers';
+import { notifyOrderPlaced } from '@/lib/notify-order';
 import { NextResponse } from 'next/server';
 
 /**
@@ -17,7 +18,7 @@ export async function POST(request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('retailer_id, approved')
+    .select('retailer_id, approved, company_name')
     .eq('id', user.id)
     .single();
 
@@ -104,6 +105,14 @@ export async function POST(request) {
         order_response: order,
       });
     }
+
+    notifyOrderPlaced({
+      order,
+      customerEmail: user.email,
+      companyName: profile.company_name,
+    }).catch((emailErr) => {
+      console.warn('[/api/markettime/orders POST] order email failed:', emailErr.message);
+    });
 
     return NextResponse.json({ order });
   } catch (err) {

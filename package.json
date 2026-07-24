@@ -10,6 +10,8 @@
     "sync:mt": "node --env-file=.env scripts/sync-markettime.js",
     "sync:customers": "node --env-file=.env scripts/sync-markettime-customers.js",
     "verify:mt": "node --env-file=.env scripts/verify-mt-key.js",
+    "monitor:mt": "node --env-file=.env scripts/monitor-mt-key.js",
+    "approve:customers": "node --env-file=.env scripts/approve-customers.js",
     "assign:customers": "node --env-file=.env scripts/assign-customer-salesperson.js"
   },
   "dependencies": {

@@ -16,6 +16,11 @@ export default function CustomerUploadPanel() {
   const [importRows, setImportRows] = useState([]);
   const [importProgress, setImportProgress] = useState(null);
   const [importResults, setImportResults] = useState([]);
+  const [approving, setApproving] = useState(false);
+
+  const successfulImportIds = importResults
+    .filter((result) => result.ok && result.recordID)
+    .map((result) => result.recordID);
 
   const handleParse = async () => {
     if (!file) {
@@ -110,6 +115,43 @@ export default function CustomerUploadPanel() {
     }
   };
 
+  const handleApproveImported = async () => {
+    if (!successfulImportIds.length) {
+      toast.error('No successful imports with retailer IDs to approve');
+      return;
+    }
+
+    if (!window.confirm(
+      `Approve ${successfulImportIds.length} customers in MarketTime so they appear in the rep customer list?`
+    )) {
+      return;
+    }
+
+    setApproving(true);
+    let approved = 0;
+    let failed = 0;
+
+    try {
+      for (let offset = 0; offset < successfulImportIds.length; offset += 100) {
+        const batch = successfulImportIds.slice(offset, offset + 100);
+        const res = await fetch('/api/admin/customers/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retailerIds: batch }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Approve batch failed');
+        approved += data.approved ?? 0;
+        failed += data.failed ?? 0;
+      }
+      toast.success(`Approved ${approved} customers${failed ? `, ${failed} failed` : ''}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const progressPct = importProgress
     ? Math.round((importProgress.done / importProgress.total) * 100)
     : 0;
@@ -119,6 +161,9 @@ export default function CustomerUploadPanel() {
       <h2 className="font-bold text-[#1a1d26] mb-2" style={{ fontFamily: "'Baloo 2', cursive" }}>
         Bulk Customer Upload
       </h2>
+      <p className="text-sm text-[#5f6980] mb-4 leading-relaxed">
+        Creates customers in MarketTime, assigns them to your configured salesperson, and approves them for the rep group so they appear in Jimmy&apos;s customer list. Rows without email are skipped at parse time.
+      </p>
       <p className="text-sm text-[#5f6980] mb-4">
         Upload an Excel file (.xlsx or .xls) to create customers in MarketTime (one API call per row).
         Columns can be in any order. Required per row: <strong>name</strong>, <strong>email</strong>, <strong>state</strong>, <strong>country</strong>, <strong>city</strong>, <strong>address</strong>, <strong>zip</strong>, and <strong>phone</strong> (country defaults to US when absent).
@@ -243,6 +288,25 @@ export default function CustomerUploadPanel() {
       )}
 
       {importResults.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleApproveImported}
+            disabled={!successfulImportIds.length || approving || importing}
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg, #00aeef, #33c1ff)' }}
+          >
+            {approving
+              ? 'Approving…'
+              : `Approve ${successfulImportIds.length} imported customers`}
+          </button>
+          <p className="text-xs text-[#5f6980] self-center">
+            Use if customers were created but don&apos;t show in MarketTime yet.
+          </p>
+        </div>
+      )}
+
+      {importResults.length > 0 && (
         <div className="max-h-48 overflow-y-auto text-xs border border-black/[0.06] rounded-lg">
           <table className="w-full">
             <thead className="bg-[#f7f8fa] sticky top-0">
@@ -260,7 +324,7 @@ export default function CustomerUploadPanel() {
                   <td className={`px-3 py-1.5 ${r.ok ? 'text-green-700' : 'text-red-700'}`}>
                     {r.ok
                       ? `${r.detail || 'Created'}${r.recordID ? ` (${r.recordID})` : ''}`
-                      : r.detail?.slice(0, 240)}
+                      : r.detail}
                   </td>
                 </tr>
               ))}
